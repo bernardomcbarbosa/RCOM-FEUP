@@ -85,6 +85,10 @@ int main(int argc, char** argv)
     printf("%d", strlen(buf));
     printf(":%s:%d\n", buf,i);
 
+    //sending
+    res = write(fd,buf,strlen(buf)+1);
+    printf("%d bytes written\n", res);
+
 
   /*
     O ciclo WHILE deve ser alterado de modo a respeitar o indicado no gui�o

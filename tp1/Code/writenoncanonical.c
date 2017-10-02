@@ -20,9 +20,9 @@ int main(int argc, char** argv)
     struct termios oldtio,newtio;
     char buf[255];
     int i, sum = 0, speed = 0;
-    
-    if ( (argc < 2) || 
-  	     ((strcmp("/dev/ttyS0", argv[1])!=0) && 
+
+    if ( (argc < 2) ||
+  	     ((strcmp("/dev/ttyS0", argv[1])!=0) &&
   	      (strcmp("/dev/ttyS1", argv[1])!=0) )) {
       printf("Usage:\tnserial SerialPort\n\tex: nserial /dev/ttyS1\n");
       exit(1);
@@ -56,9 +56,9 @@ int main(int argc, char** argv)
 
 
 
-  /* 
-    VTIME e VMIN devem ser alterados de forma a proteger com um temporizador a 
-    leitura do(s) próximo(s) caracter(es)
+  /*
+    VTIME e VMIN devem ser alterados de forma a proteger com um temporizador a
+    leitura do(s) prï¿½ximo(s) caracter(es)
   */
 
 
@@ -71,23 +71,38 @@ int main(int argc, char** argv)
     }
 
     printf("New termios structure set\n");
-    
+
     /*testing*/
     printf("-> ");
     gets(buf);
-printf("%s\n",buf);
-    res = write(fd,buf,strlen(buf)+1);   
+    printf("%s\n",buf);
+    res = write(fd,buf,strlen(buf)+1);
     printf("%d bytes written\n", res);
- 
 
-  /* 
-    O ciclo FOR e as instruções seguintes devem ser alterados de modo a respeitar 
-    o indicado no guião 
+    //reading
+    i=0;
+    while (STOP==FALSE) {
+      res = read(fd,buf+i,1);
+      if(res>0){
+        if (buf[i]=='\0'){
+         STOP=TRUE;
+        }
+       i++;
+      }
+    }
+
+    printf("%d", strlen(buf));
+    printf(":%s:%d\n", buf,i);
+
+
+  /*
+    O ciclo FOR e as instruï¿½ï¿½es seguintes devem ser alterados de modo a respeitar
+    o indicado no guiï¿½o
   */
 
 
 
-   
+
     if ( tcsetattr(fd,TCSANOW,&oldtio) == -1) {
       perror("tcsetattr");
       exit(-1);
