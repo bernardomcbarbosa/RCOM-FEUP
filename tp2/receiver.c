@@ -5,6 +5,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <unistd.h>
 
 #define BAUDRATE B38400
 #define MODEMDEVICE "/dev/ttyS1"
@@ -14,44 +15,52 @@
 
 volatile int STOP=FALSE;
 
-char buf[5];
+char set[5] = {0x7E,0x03,0x03,0x00,0x7E};
+char UA[5] = {0x7E,0x03,0x07,0x04,0x7E};
+int mode;
 int fd;
 
 int llopen(char* port){
-  int fd;
   struct termios oldtio,newtio;
 
   fd = open(port, O_RDWR | O_NOCTTY );
-  if (fd <0){
-    perror(port);
-    return -1;
-  }
+    if (fd <0) {
+		perror(port); 
+		exit(-1); 
+	}
 
-  if ( tcgetattr(fd,&oldtio) == -1) { /* save current port settings */
-    perror("tcgetattr");
-    return -1;
-  }
+    if ( tcgetattr(fd,&oldtio) == -1) { /* save current port settings */
+      perror("tcgetattr");
+      exit(-1);
+    }
 
-  bzero(&newtio, sizeof(newtio));
-  newtio.c_cflag = BAUDRATE | CS8 | CLOCAL | CREAD;
-  newtio.c_iflag = IGNPAR;
-  newtio.c_oflag = 0;
+    bzero(&newtio, sizeof(newtio));
+    newtio.c_cflag = BAUDRATE | CS8 | CLOCAL | CREAD;
+    newtio.c_iflag = IGNPAR;
+    newtio.c_oflag = 0;
 
-  /* set input mode (non-canonical, no echo,...) */
-  newtio.c_lflag = 0;
-  newtio.c_cc[VTIME]    = 1;   /* inter-character timer unused */
-  newtio.c_cc[VMIN]     = 0;   /* blocking read until 5 chars received */
+    /* set input mode (non-canonical, no echo,...) */
+    newtio.c_lflag = 0;
 
-/*
-  VTIME e VMIN devem ser alterados de forma a proteger com um temporizador a
-  leitura do(s) pr�ximo(s) caracter(es)
-*/
+    newtio.c_cc[VTIME]    = 1;   /* inter-character timer unused */
+    newtio.c_cc[VMIN]     = 0;   /* blocking read until 5 chars received */
 
-  tcflush(fd, TCIOFLUSH);
-  if ( tcsetattr(fd,TCSANOW,&newtio) == -1) {
-    perror("tcsetattr");
-    return -1;
-  }
+
+
+  /*
+    VTIME e VMIN devem ser alterados de forma a proteger com um temporizador a
+    leitura do(s) pr�ximo(s) caracter(es)
+  */
+
+
+
+    tcflush(fd, TCIOFLUSH);
+
+    if ( tcsetattr(fd,TCSANOW,&newtio) == -1) {
+      perror("tcsetattr");
+      exit(-1);
+    }
+
   return 0;
 }
 
@@ -59,53 +68,61 @@ void llclose(){
   close(fd);
 }
 
+void llwrite(char* msg){
+    int res,i;
+	for(i=0;i<5;i++)
+    	res = write(fd,msg+i,1);
+    sleep(3);
+  }
+
 void llread(){
-  int i,res;
-  char buffer[5],c;
+  int i,res=0;
+  char buffer[5],conf;
 
   //S1
   i=0;
-  while (STOP==FALSE) {
-    res = read(fd,c,1);
-    if(res>0){
-      if (c !=0x7E){
-       STOP=TRUE;
-      }
-      else
-        TA[i] = c;
+  while (res==0) {
+    res = read(fd,buffer,1);
     }
-  }
-
-  STOP = FALSE;
-  TA[1] = c;
-  i = 2;
-  while (STOP==FALSE) {
-    res = read(fd,TA+i,1);
-    if(res>0){
-      if (TA[i]==0x7E){
-       STOP=TRUE;
-      }
-     i++;
+i++;
+//S2
+while ((res!=0) && (buffer[0] == 0x7E)) {
+    res = read(fd,buffer+i,1);
+	if(buffer[i] != 0x7E)
+		break;
     }
-  }
-  llwrite(TA);
-}
+//S3
+i++;
+while ((res!=0) && (buffer[i] != 0x7E)) {
+    res = read(fd,buffer+i,1);
+	i++;
+    }
 
-void llwrite(){
-  int res;
+//READER MSG
+	for(i=0;i<5;i++)
+		printf("0x%x |",buffer[i]);
+	printf("\n");
 
-  buf[0] = 0x7E;
-  buf[1] = 0x03;
-  buf[2] = 0x03;
-  buf[3] = 0x00;
-  buf[4] = 0x7E;
-
-  res = write(fd,buf,strlen(buf)+1);
-  sleep(3);
+	if(!mode){
+		conf = buffer[1]^buffer[2];
+		if(conf == buffer[3])
+	  		llwrite(UA);
+		else
+			printf("Message Invalid\n");
+	}
+	else{
+		conf = buffer[1]^buffer[2];
+		if(conf == buffer[3])
+			printf("Sucess\n");
+		else
+			printf("Message Invalid\n");
+	}
 }
 
 int main(int argc, char** argv)
 {
+	//int j;
+
     if ( (argc < 2) ||
   	     ((strcmp("/dev/ttyS0", argv[1])!=0) &&
   	      (strcmp("/dev/ttyS1", argv[1])!=0) )) {
@@ -113,11 +130,14 @@ int main(int argc, char** argv)
       exit(1);
     }
 
-    if ((fd = llopen(argv[1])) == -1){
+    if (llopen(argv[1]) == -1){
       printf("Can't open %s\n",argv[1]);
       exit(1);
     }
+		mode = 0;
+        llread();
 
-        llread(fd);
-        return 0;
+	//for(j=0;j<5;j++)
+		//printf("0x%2x\n",set[j]);
+	return 0;
   }
