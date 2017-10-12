@@ -7,6 +7,8 @@
 #include <string.h>
 #include <unistd.h>
 #include <sys/stat.h>
+#include <string.h>
+
 
 #define BAUDRATE B38400
 #define MODEMDEVICE "/dev/ttyS1"
@@ -72,8 +74,24 @@ void llclose(){
 void llwrite(char* msg){
     int res,i;
     char buff[12000];
-
+    char *aux;
+    
+    
+    aux = malloc((strlen(set)-1) * sizeof(char*));
+    
+    
+    for (i=0; i<(strlen(set)-1); i++) {
+        aux[i]=set[i];
+    }
+    
+    
+    
     res = read(fi,buff,size);
+   
+    strcat(aux,buff);
+    
+   
+    
     for(i=0;i<size;i++){
       res = write(fd,buff+i,i);
       printf("%d\n",i);
@@ -81,6 +99,8 @@ void llwrite(char* msg){
 	// for(i=0;i<5;i++)
   //   	res = write(fd,msg+i,1);
     // sleep(3);
+    
+    free(aux);
   }
 
 void llread(){
