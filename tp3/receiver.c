@@ -12,6 +12,7 @@
 #define _POSIX_SOURCE 1 /* POSIX compliant source */
 #define FALSE 0
 #define TRUE 1
+#define START_END 0x7E
 
 volatile int STOP=FALSE;
 
@@ -66,6 +67,17 @@ int llopen(char* port){
 
 void llclose(){
   close(fd);
+}
+
+void read_byte_stuffing(char* buff){
+  char *r;
+  r = strstr(buff,BST);
+  while( r != NULL){
+    r[0] = START_END;
+    r++;
+    removeChar(r,BST[1]);
+    r = strstr(buff,BST);
+  }
 }
 
 void llwrite(char* msg){
