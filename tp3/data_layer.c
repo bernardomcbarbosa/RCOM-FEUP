@@ -1,41 +1,36 @@
-#include <sys/types.h>
-#include <sys/stat.h>
+#include "data_layer.h"
+#include <errno.h>
 #include <fcntl.h>
-#include <termios.h>
+#include <signal.h>
+#include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <strings.h>
+#include <termios.h>
 #include <unistd.h>
-#include <sys/stat.h>
-#include <string.h>
-
 
 #define BAUDRATE B38400
-#define MODEMDEVICE "/dev/ttyS1"
-#define _POSIX_SOURCE 1 /* POSIX compliant source */
-#define FALSE 0
-#define TRUE 1
-#define START_END 0x7E
-#define C1_0 0x00
-#define C1_1 0x02
-#define C2_START 2
-#define C2_END 3
-#define k(l1,l2) (256*l2+l1)
-#define n(x) (x%256)
-#define c1(x) (x%2)
 
-volatile int STOP=FALSE;
+data serial;
 
-char set[5] = {0x7E,0x03,0x03,0x00,0x7E};
-char UA[5] = {0x7E,0x03,0x07,0x04,0x7E};
-char BST[2] = {0x7D,0x5E};
-int mode;
-int fd,fi,size,atual;
-
-int llopen(char* port){
+int llopen(int port, int status){
+  int fd;
   struct termios oldtio,newtio;
 
-  fd = open(port, O_RDWR | O_NOCTTY );
+  switch (port) {
+    case 0:
+      strcpy(serial.port, COM1_PORT);
+      break;
+
+    case 1:
+      strcpy(serial.port, COM2_PORT);
+      break;
+    default:
+      break;
+  }
+
+  fd = open(serial.port, O_RDWR | O_NOCTTY );
     if (fd <0) {
 		perror(port);
 		exit(-1);
@@ -178,37 +173,3 @@ while ((res!=0) && (buffer[i] != 0x7E)) {
 			printf("Message Invalid\n");
 	}
 }
-
-int main(int argc, char** argv)
-{
-	char buf[256];
-	int res,i;
-  struct stat st;
-
-    if ( (argc < 3) ||
-  	     ((strcmp("/dev/ttyS0", argv[1])!=0) &&
-  	      (strcmp("/dev/ttyS1", argv[1])!=0) )) {
-      printf("Usage:\tnserial SerialPort\n\tex: nserial /dev/ttyS1 pinguim.gif\n");
-      exit(1);
-    }
-
-    if (llopen(argv[1]) == -1){
-      printf("Can't open %s\n",argv[1]);
-      exit(1);
-    }
-
-	fi = open(argv[2],O_RDONLY);
-	// fseek(fi, 0, SEEK_END); // seek to end of file
-	// size = ftell(fi); // get current file pointer
-	// fseek(f, 0, SEEK_SET); // seek back to beginning of file
-  fstat(fi, &st);
-  size = st.st_size;
-  atual = 0;
-	mode = 1;
-
-    //
-        llwrite(set);
-		    //   llread();
-    llclose();
-    return 0;
-  }

@@ -23,7 +23,7 @@
 #define C2_END 3
 #define k(l1,l2) (256*l2+l1)
 #define n(x) (x%256)
-#define c1(x) (x%2)
+#define c1_I(x) (x%2)
 
 volatile int STOP=FALSE;
 
