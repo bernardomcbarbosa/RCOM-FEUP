@@ -145,7 +145,7 @@ void llread(){
   while (res==0) {
     res = read(fd,buffer,1);
     }
-i++;
+    i++;
 //S2
 while ((res!=0) && (buffer[0] == 0x7E)) {
     res = read(fd,buffer+i,1);
@@ -153,7 +153,7 @@ while ((res!=0) && (buffer[0] == 0x7E)) {
 		break;
     }
 //S3
-i++;
+  i++;
 while ((res!=0) && (buffer[i] != 0x7E)) {
     res = read(fd,buffer+i,1);
 	i++;

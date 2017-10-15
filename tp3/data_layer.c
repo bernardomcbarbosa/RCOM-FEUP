@@ -12,7 +12,7 @@
 
 #define BAUDRATE B38400
 
-data serial;
+data data_layer;
 
 int llopen(int port, int status){
   int fd;
@@ -20,17 +20,17 @@ int llopen(int port, int status){
 
   switch (port) {
     case 0:
-      strcpy(serial.port, COM1_PORT);
+      strcpy(data_layer.port, COM1_PORT);
       break;
 
     case 1:
-      strcpy(serial.port, COM2_PORT);
+      strcpy(data_layer.port, COM2_PORT);
       break;
     default:
       break;
   }
 
-  fd = open(serial.port, O_RDWR | O_NOCTTY );
+  fd = open(data_layer.port, O_RDWR | O_NOCTTY );
     if (fd <0) {
 		perror(port);
 		exit(-1);
@@ -62,9 +62,82 @@ int llopen(int port, int status){
     if ( tcsetattr(fd,TCSANOW,&newtio) == -1) {
       perror("tcsetattr");
       exit(-1);
+
+
+    //If TRANSMITTER, send SET and receive UA
+    if(send_US(fd,SET) == -1)
+      return -1;
+
+
+    //IF RECEIVER, read SET and send UA
     }
 
-  return 0;
+  return fd;
+}
+
+int write_buffer(int fd, char *buffer, int buffer_length){
+  int res_total = 0,res=0;
+
+ while (buffer_length > res_total) { //Make sure all buffer is sent
+   res = write(fd, buffer, buffer_length);
+
+   if (res <= 0) {
+     return -1;
+   }
+   res_total += res;
+ }
+ return 0;
+}
+
+void read_buffer(int fd, char* buffer, int *buffer_length){
+  int i=0,res=0;
+
+  //S1
+  while (res==0) {
+    res = read(fd,buffer,1);
+  }
+    i++;
+  //S2
+  while ((res!=0) && (buffer[0] == FLAG)) {
+    res = read(fd,buffer+i,1);
+    if(buffer[i] != FLAG)
+      break;
+  }
+  //S3
+  i++;
+  while ((res!=0) && (buffer[i] != FLAG)) {
+    res = read(fd,buffer+i,1);
+    i++;
+  }
+  *buffer_length = i-1;
+}
+
+int send_US(int fd,int control) {
+  char frame[255];
+  int reply_len, attempts = 0;
+
+  while (attempts <= data_layer.numTransmissions + 1) {
+    if (write_buffer(fd, frame, len)) {
+      printf("Error writing US frame!\n");
+      return -1;
+    }
+
+    alarm(data_layer.timeout);
+
+    if (read_buffer(fd, reply, &reply_len) == 0) {
+      attempts = 0;
+      if (is_reply_valid(reply)) {
+          alarm(0);
+          return 0;
+      }
+    }
+
+    alarm(0);
+    if (attempts > 0 && attempts < data_layer.numTransmissions)
+      printf("Connection failed! Retrying %d out of %d...\n",attempts, data_layer.numTransmissions);
+  }
+
+  return -1;
 }
 
 void llclose(){

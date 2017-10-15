@@ -27,10 +27,10 @@
 #define c1_I(x) (x%2)
 
 typedef struct linkLayer {
+int fd;
 char port[20];
 int baudRate;
 unsigned int sequenceNumber;
-unsigned int timeout;
-unsigned int numTransmissions;
-char frame[MAX_SIZE]; /*Trama*/
+unsigned int timeout; //temporizador
+unsigned int numTransmissions; //Nº tentativas caso falhe
 } data;
