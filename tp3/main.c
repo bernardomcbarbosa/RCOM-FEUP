@@ -14,7 +14,7 @@
 
 int main(int argc, char** argv)
 {
-	int mode,fd;
+	int mode=-1,fd;
   struct stat st;
 
     if ( (argc < 2) ||
@@ -24,8 +24,13 @@ int main(int argc, char** argv)
       exit(1);
     }
 
+		printf("TRANSMITTER(0) or RECEIVER(1): ");
+		scanf("%d",&mode);
+
     while (mode != 0 && mode != 1) {
         printf("Invalid mode!\nTry Again!\n");
+				printf("TRANSMITTER(0) or RECEIVER(1): ");
+				scanf("%d",&mode);
       }
 
       // TRANSMITTER -> 0
@@ -35,9 +40,10 @@ int main(int argc, char** argv)
     if(!mode){
 
       char filename[50];
-      printf("File: ");
-      fgets(filename,50,stdin);
-      filename[strlen(filename)-1] = '\0';
+			fflush(stdin);
+      // printf("File: ");
+      // fgets(filename,50,stdin);
+      // filename[strlen(filename)-1] = '\0';
 
       // TRANSMITTER
       fd = connection(argv[1], mode);
@@ -70,6 +76,6 @@ int main(int argc, char** argv)
 	// mode = 1;
 
     //
-    llclose();
+    llclose(fd);
     return 0;
   }

@@ -18,10 +18,6 @@
 // #define US_FRAME_LENGTH 5
 // #define I_FRAME_HEADER_SIZE 6
 
-#define DATA_C2 1
-#define START_C2 2
-#define END_C2 3
-
 #define k(l1,l2) (256*l2+l1)
 #define n(x) (x%256)
 #define c1_I(x) (x%2)
@@ -30,7 +26,14 @@ typedef struct linkLayer {
 int fd;
 char port[20];
 int baudRate;
+int status;
 unsigned int sequenceNumber;
 unsigned int timeout; //temporizador
 unsigned int numTransmissions; //Nº tentativas caso falhe
 } data;
+
+int llopen(int port, int status);
+
+void llclose(int fd);
+
+#endif

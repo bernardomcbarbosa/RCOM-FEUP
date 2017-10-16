@@ -14,6 +14,10 @@
 #define FILE_SIZE 0
 #define FILE_NAME 1
 
+#define DATA_C2 1
+#define START_C2 2
+#define END_C2 3
+
 typedef struct applicationLayer {
        int fileDescriptor; /*Descritor correspondente à porta série*/
        int status;  /*TRANSMITTER | RECEIVER*/
