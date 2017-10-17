@@ -38,5 +38,14 @@ void send_file(char* filename){
   size = st.st_size;
 
   //START PACKET
-  char* start_packet = (char *)malloc()
+  char* start_packet = (char *)malloc(size);
+  start_packet[0] = START_C2;
+  start_packet[1] = FILE_SIZE;
+  start_packet[2] = size;
+
+  printf("%d\n",size);
+
+
+
+
 }
