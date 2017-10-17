@@ -26,9 +26,9 @@ int connection(char *port, int status){
 
 void send_file(char* filename){
   int fi,size,f;
-  stat st;
+  struct stat st;
 
-  fi = open(argv[2],O_RDONLY);
+  fi = open(port,O_RDONLY);
   if(fi < 0){
     printf("Can't open %s\n",filename);
   }
