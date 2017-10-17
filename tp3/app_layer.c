@@ -3,7 +3,7 @@
 
 app serial;
 
-int connection(char *port, int status){
+int connection( const char *port, int status){
   int serial_port;
   serial.status = status;
 
@@ -24,7 +24,7 @@ int connection(char *port, int status){
   return serial.fileDescriptor;
 }
 
-void send_file(char* filename){
+void send_file(const char *port,char* filename){
   int fi,size,f;
   struct stat st;
 

@@ -23,6 +23,6 @@ typedef struct applicationLayer {
        int status;  /*TRANSMITTER | RECEIVER*/
 } app;
 
-int connection(char *terminal, int status);
-
+int connection(const char *port, int status);
+void send_file(const char *port,char* filename);
 #endif
