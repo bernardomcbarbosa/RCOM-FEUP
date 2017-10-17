@@ -25,7 +25,9 @@ int connection(char *port, int status){
 }
 
 void send_file(char* filename){
-  int fi,size;
+  int fi,size,f;
+  stat st;
+
   fi = open(argv[2],O_RDONLY);
   if(fi < 0){
     printf("Can't open %s\n",filename);
