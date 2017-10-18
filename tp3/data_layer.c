@@ -182,8 +182,8 @@ void read_buffer(int fd, unsigned char* buffer, int *buffer_length){
       break;
     i++;
   }
-
-  *buffer_length = i+1;
+  i++;
+  *buffer_length = i;
 }
 
 int send_US(int fd,int control) {
@@ -222,6 +222,7 @@ int send_US(int fd,int control) {
       printf("Error writing US frame!\n");
       return -1;
     }
+  free(US_msg);
 
     // alarm(data_layer.timeout);
     //
@@ -245,7 +246,7 @@ unsigned char* read_byte_destuffing(unsigned char* buff, int *buff_length){
   buff_destuffed = (unsigned char *)malloc(buff_destuffed_len);
 
   for(i=0;i<(*buff_length);i++){
-    if(i==(*buff_length)-1){
+    if(i == (*buff_length)-1){
       buff_destuffed[destuff] = buff[i];
     }
     else{
@@ -324,6 +325,7 @@ int send_I(int fd,unsigned char *buffer, int length){
   final_buff[2] = c << 6;
   final_buff[3] = final_buff[1] ^ final_buff[2];
   memcpy(final_buff + 4, buffer_stuffed, buf_len);
+  free(buffer_stuffed);
   final_buff[final_len-1] = FLAG;
 
   return write_buffer(fd,final_buff,final_len);
@@ -334,9 +336,7 @@ int llwrite(int fd, unsigned char* buffer, int length){
     int buff_len,ok=1;
     while(ok){ //timeout connections
       send_I(fd,buffer,length);
-
       read_buffer(fd,buff,&buff_len);
-      //print_frame(buffer,buffer_length);
       if(is_RR(buff)){
         c = !c;
         ok = 0;
@@ -416,10 +416,10 @@ int llread(int fd,unsigned char* buffer, int *buffer_len){
      }
      finish = !finish;
    }
-
  }
 
   *buffer_len = buff_len-1;
   memcpy(buffer,buffer_destuffed,buff_len-1);
+  free(buffer_destuffed);
   return 0;
 }

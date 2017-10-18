@@ -18,6 +18,9 @@
 #define START_C2 2
 #define END_C2 3
 
+#define k(l1,l2) (256*l2+l1)
+#define n(x) (x%256)
+
 typedef struct applicationLayer {
        int fileDescriptor; /*Descritor correspondente à porta série*/
        int status;  /*TRANSMITTER | RECEIVER*/

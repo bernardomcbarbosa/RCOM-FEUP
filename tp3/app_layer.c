@@ -25,9 +25,11 @@ int connection( const char *port, int status){
 }
 
 int send_file(char* filename){
-  int fi,i,st_packet_length;
+  int fi,i,st_packet_length,read_bytes=0,send_bytes=0,sequenceN=0,send_buff_len,filesize;
   struct stat st;
   unsigned char fileSize[4];
+  unsigned char file[252];
+  unsigned char* send_buff;
 
   fi = open(filename,O_RDONLY);
   if(fi < 0){
@@ -57,19 +59,38 @@ int send_file(char* filename){
   llwrite(serial.fileDescriptor, start_packet, st_packet_length);
 
   //DATA
+  filesize = (int) size;
+  send_buff = (unsigned char *)malloc(256);
+  while(send_bytes < filesize){
+    read_bytes = read(fi, file, 252); // 256 - (C2+N+L1+L2)
+    if(read_bytes < 0)
+      printf("Error read %s\n",filename);
 
+    send_buff[0] = DATA_C2;
+    send_buff[1] = (unsigned char) n(sequenceN);
+    //K = 256*L1 + L2
+    send_buff[2] = read_bytes / 256; //L1
+    send_buff[3] = read_bytes % 256; //L2
+    memcpy(send_buff+4, file, read_bytes); //data packet
 
+    send_buff_len = read_bytes + 4;
+    llwrite(serial.fileDescriptor, send_buff, send_buff_len);
+    //free(send_buff);
+    send_bytes += read_bytes;
+    sequenceN++;
+    printf("%d / %d\n",send_bytes,filesize);
+  }
   //END PACKET
-
+  start_packet[0] = END_C2;
+  llwrite(serial.fileDescriptor, start_packet, st_packet_length);
 
   llclose(serial.fileDescriptor);
   return 0;
 }
 
 int receive_file(){
-  unsigned char buffer[256],filename[50];
-  unsigned char fileSize[4];
-  int buffer_len,res,filesize=0,i;
+  unsigned char buffer[256],filename[50],read_bytes=0,sequenceN=0,read_total;
+  int buffer_len,res,filesize=0,i,fi;
 
   //START PACKET
   res = llread(serial.fileDescriptor,buffer,&buffer_len);
@@ -84,8 +105,34 @@ int receive_file(){
   for (i = 9; i < buffer_len; i++) {
     filename[i-9] = buffer[i];
   }
+  filename[(int) buffer[8]] = '\0';
 
   //DATA PACKETS
+  fi = open((char *) filename,O_TRUNC | O_CREAT |  O_WRONLY);
+  if(fi < 0){
+    printf("Error open %s\n",filename);
+    return -1;
+  }
 
+  read_total = 0;
+  while (res != 0 || buffer[0] != END_C2){
+    res = llread(serial.fileDescriptor,buffer,&buffer_len);
+    if(res != 0)
+      continue;
+    if((int) buffer[1] == n(sequenceN)){
+      read_bytes = buffer_len - 4;
+      //if(read_bytes == (int)buffer[2]*256 + (int)buffer[3])
+      write(fi,buffer+4,read_bytes);
+      read_total += read_bytes;
+      sequenceN++;
+
+      printf("%d / %d\n",read_total,filesize);
+    }
+  }
+
+  close(fi);
+  if(read_total == filesize)
+    printf("Sucess\n");
+  llclose(serial.fileDescriptor);
   return 0;
 }
