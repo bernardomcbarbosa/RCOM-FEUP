@@ -84,13 +84,11 @@ int llopen(int port, int status){
         return -1;
 
       read_buffer(fd,buffer,&buffer_length);
-      print_frame(buffer,buffer_length);
       if(!is_US_UA(buffer))
         return -1;
     }
     else { //IF RECEIVER, read SET and send UA
       read_buffer(fd,buffer,&buffer_length);
-      print_frame(buffer,buffer_length);
       if(!is_US_SET(buffer)){
         return -1;
       }
@@ -315,7 +313,6 @@ int send_I(int fd,unsigned char *buffer, int length){
 
   //stuff buffer
   buffer_stuffed = write_byte_stuffing(buffer,&buf_len);
-  //print_frame(buffer_stuffed,buf_len);
 
   //header
   final_len = 4 + buf_len + 1;
@@ -361,9 +358,6 @@ int llread(int fd,unsigned char* buffer, int *buffer_len){
   //read buffer from tty
   read_buffer(fd,buff,&buff_len);
 
-  //memcpy(buffer,buff,(*buffer_len)); -> final
-  //print_frame(buff,buff_len);
-
   //check header
    if (is_DISC(buff))
     llclose(fd);
@@ -379,7 +373,6 @@ int llread(int fd,unsigned char* buffer, int *buffer_len){
 
    //destuff buffer
    buffer_destuffed = read_byte_destuffing(buffer,&buff_len);
-   //print_frame(buffer_destuffed,buff_len);
 
    //check bbc2 of buffer
    bcc2 = buffer_destuffed[buff_len-1];
@@ -410,7 +403,7 @@ int llread(int fd,unsigned char* buffer, int *buffer_len){
      }
      else{
        //correct frame
-       printf("frame correto\n");
+       //printf("frame correto\n");
        send_US(fd,RR);
        c = !c;
      }

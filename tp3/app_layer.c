@@ -54,8 +54,6 @@ int send_file(char* filename){
   start_packet[8] = (unsigned char) strlen(filename);
   strcat((char *) start_packet+9, (char *) filename);
 
-  // start_packet[11] = FLAG;
-
   llwrite(serial.fileDescriptor, start_packet, st_packet_length);
 
   //DATA
@@ -75,7 +73,7 @@ int send_file(char* filename){
 
     send_buff_len = read_bytes + 4;
     llwrite(serial.fileDescriptor, send_buff, send_buff_len);
-    //free(send_buff);
+
     send_bytes += read_bytes;
     sequenceN++;
     printf("%d / %d\n",send_bytes,filesize);
@@ -89,7 +87,7 @@ int send_file(char* filename){
 }
 
 int receive_file(){
-  unsigned char buffer[256],filename[50],read_bytes=0,sequenceN=0,read_total;
+  unsigned char buffer[256],filename[50],read_bytes=0,sequenceN=0;
   int buffer_len,res,filesize=0,i,fi;
 
   //START PACKET
@@ -114,25 +112,22 @@ int receive_file(){
     return -1;
   }
 
-  read_total = 0;
+  ssize_t write_total = 0;
   while (res != 0 || buffer[0] != END_C2){
     res = llread(serial.fileDescriptor,buffer,&buffer_len);
     if(res != 0)
       continue;
     if((int) buffer[1] == n(sequenceN)){
       read_bytes = buffer_len - 4;
-      //if(read_bytes == (int)buffer[2]*256 + (int)buffer[3])
-      write(fi,buffer+4,read_bytes);
-      read_total += read_bytes;
+      //read_bytes == (int)buffer[2]*256 + (int)buffer[3])
+      write_total += write(fi,buffer+4,read_bytes);
       sequenceN++;
 
-      printf("%d / %d\n",read_total,filesize);
+      printf("%ld / %d\n",write_total,filesize);
     }
   }
 
   close(fi);
-  if(read_total == filesize)
-    printf("Sucess\n");
   llclose(serial.fileDescriptor);
   return 0;
 }
