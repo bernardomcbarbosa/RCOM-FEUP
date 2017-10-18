@@ -24,46 +24,52 @@ int connection( const char *port, int status){
   return serial.fileDescriptor;
 }
 
-void send_file(const char *port,char* filename){
-  int fi,size,f;
+int send_file(char* filename){
+  int fi,i,st_packet_length;
   struct stat st;
-  char *fileSize;
-  int resto = 256;
+  unsigned char fileSize[4];
 
-  fi = open(port,O_RDONLY);
+  fi = open(filename,O_RDONLY);
   if(fi < 0){
     printf("Can't open %s\n",filename);
+    return -1;
   }
 
-  fseek(fi, 0, SEEK_END); // seek to end of file
-	size = ftell(fi); // get current file pointer
-	fseek(f, 0, SEEK_SET); // seek back to beginning of file
   fstat(fi, &st);
-  size = st.st_size;
+  off_t size = st.st_size;
 
   //START PACKET
-  char* start_packet = (char *)malloc(3;
+  st_packet_length = 7 + (1+1+strlen(filename));
+  unsigned char* start_packet = (unsigned char *)malloc(st_packet_length);
   start_packet[0] = START_C2;
   start_packet[1] = FILE_SIZE;
   start_packet[2] = 0x04;
+  for (i = 0; i < 4; i++) {
+        fileSize[i] = (unsigned char) (size>>(8*i) % 256);
+  }
+  strcat((char *) start_packet+3, (char *) fileSize);
+  start_packet[7]= FILE_NAME;
+  start_packet[8] = (unsigned char) strlen(filename);
+  strcat((char *) start_packet+9, (char *) filename);
 
-  fileSize =  (char *)malloc(size);
+  start_packet[11] = FLAG;
 
-for (size_t i = 0; i < 4; i++) {
-    fileSize[i] = size % resto;
-    resto = resto % 256;
+  llwrite(serial.fileDescriptor, start_packet, st_packet_length);
+
+  //DATA
+
+
+  //END PACKET
+
+
+  llclose(serial.fileDescriptor);
+  return 0;
 }
-  printf("%d\n",size);
 
-start_packet = (char *) realloc(start_packet, sizeof(start_packet) + sizeof(fileSize)+ );
+int receive_file(){
+  unsigned char buffer[256];
+  int buffer_len;
+  llread(serial.fileDescriptor,buffer,&buffer_len);
 
-strcat(start_packet, fileSize);
-
-start_packet[7]= FILE_NAME;
-
-start_packet[8] = strlen(filename);
-
-
-
-
+  return 0;
 }

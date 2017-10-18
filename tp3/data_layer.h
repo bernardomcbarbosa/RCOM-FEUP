@@ -36,4 +36,8 @@ int llopen(int port, int status);
 
 void llclose(int fd);
 
+int llwrite(int fd, unsigned char* buffer, int length);
+
+int llread(int fd,unsigned char* buffer, int *buffer_len);
+
 #endif

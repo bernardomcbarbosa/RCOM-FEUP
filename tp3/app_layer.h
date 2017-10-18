@@ -11,7 +11,7 @@
 #include <fcntl.h>
 #include <stdint.h>
 
-#define FILE_SIZE 0
+#define FILE_SIZE 0x00
 #define FILE_NAME 1
 
 #define DATA_C2 1
@@ -24,5 +24,6 @@ typedef struct applicationLayer {
 } app;
 
 int connection(const char *port, int status);
-void send_file(const char *port,char* filename);
+int send_file(char* filename);
+int receive_file();
 #endif

@@ -15,7 +15,6 @@
 int main(int argc, char** argv)
 {
 	int mode=-1,fd;
-  struct stat st;
 
     if ( (argc < 2) ||
   	     ((strcmp("/dev/ttyS0", argv[1])!=0) &&
@@ -35,11 +34,8 @@ int main(int argc, char** argv)
 
       // TRANSMITTER -> 0
       // RECEIVER -> 1
-
-
     if(!mode){
-
-      char filename[50];
+      char filename[50] = "pinguim.gif";
 			fflush(stdin);
       // printf("File: ");
       // fgets(filename,50,stdin);
@@ -51,7 +47,7 @@ int main(int argc, char** argv)
       if(fd == -1)
         return -1;
 
-        // send_data(filename);
+      send_file(filename);
     }
     else if(mode){
       // RECEIVER
@@ -60,22 +56,8 @@ int main(int argc, char** argv)
       if(fd == -1)
         return -1;
 
-        // receive_data();
-
-
+      receive_file();
     }
 
-
-	// fi = open(argv[2],O_RDONLY);
-	// fseek(fi, 0, SEEK_END); // seek to end of file
-	// size = ftell(fi); // get current file pointer
-	// fseek(f, 0, SEEK_SET); // seek back to beginning of file
-  // fstat(fi, &st);
-  // size = st.st_size;
-  // atual = 0;
-	// mode = 1;
-
-    //
-    llclose(fd);
     return 0;
   }

@@ -15,17 +15,18 @@
 char BST[2] = {0x7D,0x5E};
 data data_layer;
 
-int is_US_SET(char* frame);
-int is_US_UA(char* frame);
-int write_buffer(int fd, char *buffer, int buffer_length);
-void read_buffer(int fd, char* buffer, int *buffer_length);
+int is_US_SET(unsigned char* frame);
+int is_US_UA(unsigned char* frame);
+int write_buffer(int fd, unsigned char *buffer, int buffer_length);
+void read_buffer(int fd, unsigned char* buffer, int *buffer_length);
 int send_US(int fd,int control);
-void print_US_frame(char* frame);
+int send_I(int fd,unsigned char *buffer, int length);
+void print_frame(unsigned char *frame,int frame_len);
 
 int llopen(int port, int status){
   int fd;
   struct termios oldtio,newtio;
-  char buffer[5];
+  unsigned char buffer[5];
   int buffer_length;
 
   data_layer.status = status;
@@ -76,18 +77,20 @@ int llopen(int port, int status){
       exit(-1);
     }
 
-      if(!data_layer.status){ //If TRANSMITTER, send SET and receive UA
-    if(send_US(fd,SET) == -1)
-      return -1;
+    if(!data_layer.status){
+      //If TRANSMITTER, send SET and receive UA
+      if(send_US(fd,SET) == -1)
+        return -1;
 
       read_buffer(fd,buffer,&buffer_length);
+      print_frame(buffer,buffer_length);
       if(!is_US_UA(buffer))
         return -1;
     }
     else { //IF RECEIVER, read SET and send UA
       read_buffer(fd,buffer,&buffer_length);
+      print_frame(buffer,buffer_length);
       if(!is_US_SET(buffer)){
-        print_US_frame(buffer);
         return -1;
       }
 
@@ -97,28 +100,36 @@ int llopen(int port, int status){
     return fd;
 }
 
-void print_US_frame(char *frame){
+void print_frame(unsigned char *frame,int frame_len){
   int i;
-  for(i=0;i<5;i++)
-    printf(" %2X ",frame[i]);
-  printf("\n");
+  printf("----------------\n");
+  for(i=0;i<frame_len;i++)
+    printf("0x%2X\n",frame[i]);
+  printf("----------------\n");
 }
 
-int is_US_SET(char* frame){
+int is_US_SET(unsigned char* frame){
   if(frame[0] == FLAG && frame[1] == SEND_A && frame[2]==SET && ((frame[1] ^ frame[2]) == frame[3]) && frame[4] == FLAG)
     return 1;
   else
     return 0;
 }
 
-int is_US_UA(char* frame){
+int is_US_UA(unsigned char* frame){
   if(frame[0] == FLAG && frame[1] == SEND_A && frame[2]==UA && ((frame[1] ^ frame[2]) == frame[3]) && frame[4] == FLAG)
     return 1;
   else
     return 0;
 }
 
-int write_buffer(int fd, char *buffer, int buffer_length){
+int is_DISC(unsigned char* frame){
+  if(frame[0] == FLAG && frame[1] == RECEIVE_A && frame[2]== DISC && ((frame[1] ^ frame[2]) == frame[3]) && frame[4] == FLAG)
+    return 1;
+  else
+    return 0;
+}
+
+int write_buffer(int fd, unsigned char *buffer, int buffer_length){
   int res_total = 0,res=0;
 
  while (buffer_length > res_total) { //Make sure all buffer is sent
@@ -129,10 +140,10 @@ int write_buffer(int fd, char *buffer, int buffer_length){
    }
    res_total += res;
  }
- return 0;
+ return res_total;
 }
 
-void read_buffer(int fd, char* buffer, int *buffer_length){
+void read_buffer(int fd, unsigned char* buffer, int *buffer_length){
   int i=0,res=0;
 
   //S1
@@ -150,20 +161,21 @@ void read_buffer(int fd, char* buffer, int *buffer_length){
 
   //S3
   i++;
-  while ((res!=0) && (buffer[i] != FLAG)) {
+  while ((res!=0)) {
     res = read(fd,buffer+i,1);
+    if(buffer[i] == FLAG)
+      break;
     i++;
   }
 
-  *buffer_length = i-1;
-  print_US_frame(buffer);
+  *buffer_length = i+1;
 }
 
 int send_US(int fd,int control) {
-  char* US_msg;
+  unsigned char* US_msg;
   int attempts = 0;
 
-  US_msg = (char *) malloc(5);
+  US_msg = (unsigned char *) malloc(5);
 
   US_msg[0] = FLAG;
 
@@ -186,7 +198,7 @@ int send_US(int fd,int control) {
   US_msg[4] = FLAG;
 
   // while (attempts <= data_layer.numTransmissions + 1) {
-    if (write_buffer(fd, US_msg, 5)) {
+    if (write_buffer(fd, US_msg, 5) == -1) {
       printf("Error writing US frame!\n");
       return -1;
     }
@@ -205,85 +217,130 @@ void llclose(int fd){
   close(fd);
 }
 
-void addChar(char *str, char c){
-  int i = 0;
-  str[strlen(str)+1] = '\0';
-  str[strlen(str)] = c;
-  for(i=strlen(str)-1;i>=1;i--)
-      str[i] = str[i-1];
-  str[0] = c;
-}
+unsigned char* read_byte_destuffing(unsigned char* buff, int *buff_length){
+  int i,destuff=0,buff_destuffed_len;
+  unsigned char* buff_destuffed;
 
-void removeChar(char *str, char c) {
-int i = 0;
+  buff_destuffed_len = (*buff_length);
+  buff_destuffed = (unsigned char *)malloc(buff_destuffed_len);
 
-for(i=0;i<strlen(str)-1;i++)
-    str[i] = str[i+1];
-str[i] = '\0';
-}
-
-void write_byte_stuffing(char* buff){
-  char *r;
-  r = strchr(buff,FLAG);
-  while( r != NULL){
-    r[0] = BST[0];
-    r++;
-    addChar(r,BST[1]);
-    r = strchr(buff,FLAG);
+  for(i=0;i<(*buff_length);i++){
+    if(i==(*buff_length)-1){
+      buff_destuffed[destuff] = buff[i];
+    }
+    else{
+      if(buff[i] == BST[0] && buff[i+1] == BST[1]){
+        buff_destuffed[destuff] = FLAG;
+        destuff++;
+        i++;
+        buff_destuffed_len--;
+        buff_destuffed = (unsigned char *)realloc(buff_destuffed,buff_destuffed_len);
+      }
+      else{
+        buff_destuffed[destuff] = buff[i];
+        destuff++;
+      }
+    }
   }
+  (*buff_length) = buff_destuffed_len;
+  return buff_destuffed;
 }
 
-char* get_package(int c2){
-    char* buff;
-    // int res,i=4;
-    //
-    buff = (char *) malloc(504);
-    // res = read(fi,buff+i,251);
-  return buff;
+unsigned char* write_byte_stuffing(unsigned char* buff, int *buff_length){
+  int i,stuff=0,buff_stuffed_len;
+  unsigned char *buff_stuffed;
+
+  buff_stuffed_len = (*buff_length);
+  buff_stuffed = (unsigned char *)malloc(buff_stuffed_len);
+
+  for(i=0;i<(*buff_length);i++){
+    if(buff[i] == FLAG){
+    buff_stuffed[stuff] = BST[0];
+    stuff++;
+    buff_stuffed[stuff] = BST[1];
+    stuff++;
+    buff_stuffed_len++;
+    buff_stuffed = (unsigned char *)realloc(buff_stuffed,buff_stuffed_len);
+    }
+    else{
+      buff_stuffed[stuff] = buff[i];
+      stuff++;
+    }
+  }
+  (*buff_length) = buff_stuffed_len;
+  return buff_stuffed;
 }
 
-char get_bcc2(char *pack){
+char get_bcc2(unsigned char *pack,int pack_len){
   int i=0;
   char c = pack[i];
-  for(i=1;i<strlen(pack);i++)
+  for(i=1;i<pack_len;i++)
     c ^= pack[i];
   return c;
 }
 
-void llwrite(char* msg){
-    // int res,i;
-    // char* buff;
-    //
-    // buff = get_package();
-    //
-    // for(i=0;i<size;i++){
-    //   res = write(fd,buff+i,i);
-    //   printf("%d\n",i);
-    // }
-    //
-    // free(buff);
+int send_I(int fd,unsigned char *buffer, int length){
+  unsigned char bcc2;
+  unsigned char *buffer_stuffed;
+  int buf_len,final_len;
+  static int c=1;
+  c = !c;
+
+  //get bbc2
+  bcc2 = get_bcc2(buffer,length);
+  buf_len = length+1;
+  buffer = (unsigned char *)realloc(buffer,buf_len);
+  buffer[buf_len-1] = bcc2;
+
+  //stuff buffer
+  buffer_stuffed = write_byte_stuffing(buffer,&buf_len);
+  print_frame(buffer_stuffed,buf_len);
+
+  //header
+  final_len = 4 + buf_len + 1;
+  unsigned char* final_buff = (unsigned char *)malloc(final_len);
+  final_buff[0] = FLAG;
+  final_buff[1] = SEND_A;
+  final_buff[2] = c << 6;
+  final_buff[3] = final_buff[1] ^ final_buff[2];
+  memcpy(final_buff + 4, buffer_stuffed, buf_len);
+  final_buff[final_len-1] = FLAG;
+
+  return write_buffer(fd,final_buff,final_len);
+}
+
+int llwrite(int fd, unsigned char* buffer, int length){
+    return send_I(fd,buffer,length);
   }
 
-void llread(int fd){
-  int i,res=0;
-  char buffer[5],conf;
+int llread(int fd,unsigned char* buffer, int *buffer_len){
+  unsigned char buff[512];
+  unsigned char* buffer_destuffed;
+  static int c = 0;
+  int buff_len;
 
-  //S1
-  i=0;
-  while (res==0) {
-    res = read(fd,buffer,1);
-    }
-    i++;
-//S2
-while ((res!=0) && (buffer[0] == 0x7E)) {
-    res = read(fd,buffer+i,1);
-	if(buffer[i] != 0x7E)
-		break;
-    }
-//S3
-i++;
-while ((res!=0) && (buffer[i] != 0x7E)) {
-    res = read(fd,buffer+i,1);
-	i++;
-    }
+  //read buffer from tty
+  read_buffer(fd,buff,&buff_len);
+
+  //memcpy(buffer,buff,(*buffer_len)); -> final
+  print_frame(buff,buff_len);
+
+  //check header
+   if (is_DISC(buff))
+    llclose(fd);
+
+   if(!(buff[0] == FLAG && buff[1] == SEND_A && buff[3] == (buff[1] ^ buff[2]))){
+     //send_US(fd, REJ);
+   }
+   else{
+     buff_len -= 5; // 5 == FLAG + A + C1 + BCC1 + FLAG
+   }
+
+   memcpy(buffer,buff+4,buff_len);
+
+   //destuff buffer
+   buffer_destuffed = read_byte_destuffing(buffer,&buff_len);
+   print_frame(buffer_destuffed,buff_len);
+
+  return 0;
 }
