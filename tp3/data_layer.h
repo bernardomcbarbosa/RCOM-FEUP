@@ -9,8 +9,8 @@
 #define SET 0x03
 #define DISC 0x0B
 #define UA 0x07
-// #define RR 0x05
-// #define REJ 0x01
+#define REJ 0x01
+#define RR 0x05
 
 #define COM1 "/dev/ttyS0"
 #define COM2 "/dev/ttyS1"

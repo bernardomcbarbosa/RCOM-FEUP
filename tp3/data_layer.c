@@ -14,6 +14,7 @@
 
 char BST[2] = {0x7D,0x5E};
 data data_layer;
+static int c=0; //llwrite / RR / REJ
 
 int is_US_SET(unsigned char* frame);
 int is_US_UA(unsigned char* frame);
@@ -129,6 +130,20 @@ int is_DISC(unsigned char* frame){
     return 0;
 }
 
+int is_RR(unsigned char* frame) {
+  if(frame[0] == FLAG && frame[1] == SEND_A && frame[2]== (c << 7 | RR) && ((frame[1] ^ frame[2]) == frame[3]) && frame[4] == FLAG)
+    return 1;
+  else
+    return 0;
+}
+
+int is_REJ(unsigned char* frame) {
+  if(frame[0] == FLAG && frame[1] == SEND_A && frame[2]== (c << 7 | REJ) && ((frame[1] ^ frame[2]) == frame[3]) && frame[4] == FLAG)
+    return 1;
+  else
+    return 0;
+}
+
 int write_buffer(int fd, unsigned char *buffer, int buffer_length){
   int res_total = 0,res=0;
 
@@ -174,6 +189,7 @@ void read_buffer(int fd, unsigned char* buffer, int *buffer_length){
 int send_US(int fd,int control) {
   unsigned char* US_msg;
   int attempts = 0;
+  static int c = 0;
 
   US_msg = (unsigned char *) malloc(5);
 
@@ -186,14 +202,18 @@ int send_US(int fd,int control) {
       US_msg[1] = RECEIVE_A;
   }
   else{
-    if(control == UA) // || control == REJ || control == RR)
+    if(control == UA || control == REJ || control == RR)
       US_msg[1] = SEND_A;
     else
       US_msg[1] = RECEIVE_A;
   }
 
+  if (control == REJ || control == RR) {
+    US_msg[2] = c << 7 | control;
+    c = !c;
+  } else
+    US_msg[2] = control;
 
-  US_msg[2] = control;
   US_msg[3] = US_msg[1] ^ US_msg[2];
   US_msg[4] = FLAG;
 
@@ -271,7 +291,7 @@ unsigned char* write_byte_stuffing(unsigned char* buff, int *buff_length){
   return buff_stuffed;
 }
 
-char get_bcc2(unsigned char *pack,int pack_len){
+unsigned char get_bcc2(unsigned char *pack,int pack_len){
   int i=0;
   char c = pack[i];
   for(i=1;i<pack_len;i++)
@@ -294,7 +314,7 @@ int send_I(int fd,unsigned char *buffer, int length){
 
   //stuff buffer
   buffer_stuffed = write_byte_stuffing(buffer,&buf_len);
-  print_frame(buffer_stuffed,buf_len);
+  //print_frame(buffer_stuffed,buf_len);
 
   //header
   final_len = 4 + buf_len + 1;
@@ -310,27 +330,46 @@ int send_I(int fd,unsigned char *buffer, int length){
 }
 
 int llwrite(int fd, unsigned char* buffer, int length){
-    return send_I(fd,buffer,length);
+    unsigned char buff[5];
+    int buff_len,ok=1;
+    while(ok){ //timeout connections
+      send_I(fd,buffer,length);
+
+      read_buffer(fd,buff,&buff_len);
+      //print_frame(buffer,buffer_length);
+      if(is_RR(buff)){
+        c = !c;
+        ok = 0;
+      }
+      // else if(is_US_REJ){
+      //
+      // }
+    }
+
+      return 0;
   }
 
 int llread(int fd,unsigned char* buffer, int *buffer_len){
-  unsigned char buff[512];
+  unsigned char buff[512],bcc2;
   unsigned char* buffer_destuffed;
   static int c = 0;
   int buff_len;
+  int finish=0;
 
+
+  while(!finish){
   //read buffer from tty
   read_buffer(fd,buff,&buff_len);
 
   //memcpy(buffer,buff,(*buffer_len)); -> final
-  print_frame(buff,buff_len);
+  //print_frame(buff,buff_len);
 
   //check header
    if (is_DISC(buff))
     llclose(fd);
 
    if(!(buff[0] == FLAG && buff[1] == SEND_A && buff[3] == (buff[1] ^ buff[2]))){
-     //send_US(fd, REJ);
+     return -1;
    }
    else{
      buff_len -= 5; // 5 == FLAG + A + C1 + BCC1 + FLAG
@@ -340,7 +379,47 @@ int llread(int fd,unsigned char* buffer, int *buffer_len){
 
    //destuff buffer
    buffer_destuffed = read_byte_destuffing(buffer,&buff_len);
-   print_frame(buffer_destuffed,buff_len);
+   //print_frame(buffer_destuffed,buff_len);
 
+   //check bbc2 of buffer
+   bcc2 = buffer_destuffed[buff_len-1];
+
+   if(!( bcc2 == get_bcc2(buffer_destuffed,buff_len-1) )) {
+
+     if(buff[2] != (c<<6)){
+       //duplicate frame
+       //send RR
+       //ask again
+       printf("frame duplicado\n");
+       send_US(fd,RR);
+       return -1;
+     }
+     else{
+       printf("bcc2 errado\n");
+       send_US(fd,REJ);
+       //REJ
+     }
+
+   }
+   else{
+
+     if(buff[2] != (c<<6)){
+       //duplicate frame
+       printf("frame duplicado e bcc2 certo\n");
+       return -1;
+     }
+     else{
+       //correct frame
+       printf("frame correto\n");
+       send_US(fd,RR);
+       c = !c;
+     }
+     finish = !finish;
+   }
+
+ }
+
+  *buffer_len = buff_len-1;
+  memcpy(buffer,buffer_destuffed,buff_len-1);
   return 0;
 }

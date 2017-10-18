@@ -52,7 +52,7 @@ int send_file(char* filename){
   start_packet[8] = (unsigned char) strlen(filename);
   strcat((char *) start_packet+9, (char *) filename);
 
-  start_packet[11] = FLAG;
+  // start_packet[11] = FLAG;
 
   llwrite(serial.fileDescriptor, start_packet, st_packet_length);
 
@@ -67,9 +67,25 @@ int send_file(char* filename){
 }
 
 int receive_file(){
-  unsigned char buffer[256];
-  int buffer_len;
-  llread(serial.fileDescriptor,buffer,&buffer_len);
+  unsigned char buffer[256],filename[50];
+  unsigned char fileSize[4];
+  int buffer_len,res,filesize=0,i;
+
+  //START PACKET
+  res = llread(serial.fileDescriptor,buffer,&buffer_len);
+  while (res != 0 || buffer[0] != START_C2){
+    res = llread(serial.fileDescriptor,buffer,&buffer_len);
+  }
+  //filesize
+  for (i = 3; i < 7; i++) {
+        filesize += (int) (buffer[i]<<(8*(i-3)));
+  }
+  //filename
+  for (i = 9; i < buffer_len; i++) {
+    filename[i-9] = buffer[i];
+  }
+
+  //DATA PACKETS
 
   return 0;
 }
