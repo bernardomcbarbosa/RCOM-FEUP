@@ -6,12 +6,12 @@ CCFLAGS= -Wall
 
 PROG = rcom.out
 
-SOURCES = $(wildcard *.c)
+SOURCES = app_layer.c data_layer.c
 OBJECTS = $(SOURCES:.c=.o)
 
 .PHONY : rcom
 rcom : $(OBJECTS)
-	$(CC) $(CCFLAGS) $< $(OBJECTS) -o $(PROG)
+	$(CC) $(CCFLAGS) main.c $(OBJECTS) -o $(PROG)
 	rm -f $(OBJECTS)
 
 # To obtain object files

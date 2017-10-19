@@ -11,8 +11,6 @@
 #include "app_layer.h"
 #include "data_layer.h"
 
-#define MODEMDEVICE "/dev/ttyS1"
-
 int main(int argc, char** argv)
 {
 	int mode=-1,fd;
