@@ -1,6 +1,4 @@
 #include <stdio.h>
-#include "app_layer.h"
-#include "data_layer.h"
 #include <fcntl.h>
 #include <signal.h>
 #include <stdlib.h>
@@ -9,6 +7,9 @@
 #include <sys/types.h>
 #include <termios.h>
 #include <unistd.h>
+
+#include "app_layer.h"
+#include "data_layer.h"
 
 #define MODEMDEVICE "/dev/ttyS1"
 

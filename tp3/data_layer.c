@@ -1,4 +1,3 @@
-#include "data_layer.h"
 #include <errno.h>
 #include <fcntl.h>
 #include <signal.h>
@@ -9,6 +8,8 @@
 #include <strings.h>
 #include <termios.h>
 #include <unistd.h>
+
+#include "data_layer.h"
 
 #define BAUDRATE B38400
 

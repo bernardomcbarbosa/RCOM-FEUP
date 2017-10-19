@@ -29,4 +29,5 @@ typedef struct applicationLayer {
 int connection(const char *port, int status);
 int send_file(char* filename);
 int receive_file();
+
 #endif
