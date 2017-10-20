@@ -1,16 +1,6 @@
 #ifndef APP_LAYER_H
 #define APP_LAYER_H
 
-#include "data_layer.h"
-#include <stdio.h>
-#include <string.h>
-#include <unistd.h>
-#include <termios.h>
-#include <sys/stat.h>
-#include <stdlib.h>
-#include <fcntl.h>
-#include <stdint.h>
-
 #define FILE_SIZE 0x00
 #define FILE_NAME 1
 
@@ -27,6 +17,9 @@ typedef struct applicationLayer {
 } app;
 
 int connection(const char *port, int status);
+
 int send_file(char* filename);
+
 int receive_file();
+
 #endif

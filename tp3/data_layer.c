@@ -1,4 +1,3 @@
-#include "data_layer.h"
 #include <errno.h>
 #include <fcntl.h>
 #include <signal.h>
@@ -10,19 +9,13 @@
 #include <termios.h>
 #include <unistd.h>
 
+#include "data_layer.h"
+
 #define BAUDRATE B38400
 
 char BST[2] = {0x7D,0x5E};
 data data_layer;
 static int c=0; //llwrite / RR / REJ
-
-int is_US_SET(unsigned char* frame);
-int is_US_UA(unsigned char* frame);
-int write_buffer(int fd, unsigned char *buffer, int buffer_length);
-void read_buffer(int fd, unsigned char* buffer, int *buffer_length);
-int send_US(int fd,int control);
-int send_I(int fd,unsigned char *buffer, int length);
-void print_frame(unsigned char *frame,int frame_len);
 
 int llopen(int port, int status){
   int fd;
@@ -128,14 +121,14 @@ int is_DISC(unsigned char* frame){
     return 0;
 }
 
-int is_RR(unsigned char* frame) {
+int is_RR(unsigned char* frame){
   if(frame[0] == FLAG && frame[1] == SEND_A && frame[2]== (c << 7 | RR) && ((frame[1] ^ frame[2]) == frame[3]) && frame[4] == FLAG)
     return 1;
   else
     return 0;
 }
 
-int is_REJ(unsigned char* frame) {
+int is_REJ(unsigned char* frame){
   if(frame[0] == FLAG && frame[1] == SEND_A && frame[2]== (c << 7 | REJ) && ((frame[1] ^ frame[2]) == frame[3]) && frame[4] == FLAG)
     return 1;
   else
