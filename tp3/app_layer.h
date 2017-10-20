@@ -13,7 +13,7 @@
 
 typedef struct applicationLayer{
        int fileDescriptor; /*Descritor correspondente à porta série*/
-       int status;  /*TRANSMITTER | RECEIVER*/
+       int mode;  /*TRANSMITTER | RECEIVER*/
 } applicationLayer;
 
 int connection(const char *port, int status);

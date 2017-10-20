@@ -11,11 +11,19 @@
 
 #include "data_layer.h"
 
-#define BAUDRATE B38400
-
 char BST[2] = {0x7D,0x5E};
 linkLayer data_layer;
 static int c=0; //llwrite / RR / REJ
+
+/*
+int llopen(int port, int mode)
+argumentos
+– port: COM1, COM2, ...
+– mode: TRANSMITTER / RECEIVER
+retorno
+– identificador da ligação de dados
+– valor negativo em caso de erro
+*/
 
 int llopen(int port, int mode){
   int fd;
@@ -31,25 +39,27 @@ int llopen(int port, int mode){
       strcpy(data_layer.port, COM1);
     }
     break;
-
     case 1:
     {
       strcpy(data_layer.port, COM2);
     }
     break;
     default:
+    {
+      return -1;
+    }
     break;
   }
 
   fd = open(data_layer.port, O_RDWR | O_NOCTTY );
   if (fd <0) {
     perror(data_layer.port);
-    exit(-1);
+    return -1;
   }
 
   if (tcgetattr(fd,&oldtio) == -1) { /* save current port settings */
     perror("tcgetattr");
-    exit(2);
+    return -1;
   }
 
   bzero(&newtio, sizeof(newtio));
@@ -70,29 +80,33 @@ int llopen(int port, int mode){
 
   tcflush(fd, TCIOFLUSH);
 
-  if ( tcsetattr(fd,TCSANOW,&newtio) == -1) {
+  if (tcsetattr(fd,TCSANOW,&newtio) == -1) {
     perror("tcsetattr");
     exit(-1);
   }
+  //****
 
-  if(!data_layer.mode){
-    //If TRANSMITTER, send SET and receive UA
+  if (data_layer.mode){
+    //RECEIVER
+    read_buffer(fd,buffer,&buffer_length);
+    if(!is_US_SET(buffer)){
+      return -1;
+    }
+
+      if(send_US(fd,UA) == -1){
+        return -1;
+      }
+  }
+  else{
+    //TRANSMITTER
     if(send_US(fd,SET) == -1)
       return -1;
 
     read_buffer(fd,buffer,&buffer_length);
     if(!is_US_UA(buffer))
       return -1;
-    }
-  else { //IF RECEIVER, read SET and send UA
-    read_buffer(fd,buffer,&buffer_length);
-    if(!is_US_SET(buffer)){
-      return -1;
-    }
-
-      if(send_US(fd,UA) == -1)
-        return -1;
   }
+
   return fd;
 }
 

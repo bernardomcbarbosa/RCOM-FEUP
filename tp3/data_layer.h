@@ -15,6 +15,8 @@
 #define REJ 0x01
 #define RR 0x05
 
+#define BAUDRATE B38400
+
 typedef struct linkLayer {
 int fd;
 char port[20];

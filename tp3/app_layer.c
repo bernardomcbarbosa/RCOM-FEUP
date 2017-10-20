@@ -13,22 +13,22 @@
 
 applicationLayer serial; //see header file
 
-int connection( const char *port, int status){
+int connection(const char *port, int mode){
   int serial_port;
-  serial.status = status;
+  serial.mode = mode;
 
   if (strcmp(port, COM1) == 0)
     serial_port = 0;
   else if(strcmp(port, COM2) == 0)
     serial_port = 1;
   else{
-    printf("Invalid Port!\n");
-    return -1;
+    fprintf(stderr, "Invalid Port!");
+    exit(1);
   }
 
-  if ((serial.fileDescriptor = llopen(serial_port, serial.status)) == -1) {
-    printf("Can't open %s\n",port);
-    return -1;
+  if ((serial.fileDescriptor = llopen(serial_port, serial.mode)) == -1) {
+    fprintf(stderr, "Error opening port %s\n", port);
+    exit(1);
   }
 
   return serial.fileDescriptor;
