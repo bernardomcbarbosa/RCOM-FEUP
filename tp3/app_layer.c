@@ -11,7 +11,7 @@
 #include "data_layer.h"
 #include "app_layer.h"
 
-app serial;
+applicationLayer serial; //see header file
 
 int connection( const char *port, int status){
   int serial_port;

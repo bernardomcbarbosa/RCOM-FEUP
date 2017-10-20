@@ -18,10 +18,10 @@
 typedef struct linkLayer {
 int fd;
 char port[20];
-int status;
+int mode;
 unsigned int timeout; //temporizador
 unsigned int numTransmissions; //Nº tentativas caso falhe
-} data;
+} linkLayer;
 
 int llopen(int port, int status);
 

@@ -11,10 +11,10 @@
 #define k(l1,l2) (256*l2+l1)
 #define n(x) (x%256)
 
-typedef struct applicationLayer {
+typedef struct applicationLayer{
        int fileDescriptor; /*Descritor correspondente à porta série*/
        int status;  /*TRANSMITTER | RECEIVER*/
-} app;
+} applicationLayer;
 
 int connection(const char *port, int status);
 
