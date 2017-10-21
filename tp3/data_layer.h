@@ -4,6 +4,8 @@
 #define COM1 "/dev/ttyS0"
 #define COM2 "/dev/ttyS1"
 
+#define US_frame_size 5
+
 #define FLAG 0x7E
 
 #define SEND_A 0x03
@@ -20,7 +22,7 @@
 typedef struct linkLayer {
 int fd;
 char port[20];
-int mode;
+int mode; //TRANSMITTER 0 / RECEIVER 1
 unsigned int timeout; //temporizador
 unsigned int numTransmissions; //Nº tentativas caso falhe
 } linkLayer;
@@ -35,10 +37,10 @@ int is_DISC(unsigned char* frame);
 int is_RR(unsigned char* frame);
 int is_REJ(unsigned char* frame);
 
-int write_buffer(int fd, unsigned char *buffer, int buffer_length);
+int write_buffer(int fd, unsigned char *buffer, int buffer_size);
 void read_buffer(int fd, unsigned char* buffer, int *buffer_length);
 
-int send_US(int fd,int control);
+int send_US_frame(int fd,int control);
 
 void llclose(int fd);
 

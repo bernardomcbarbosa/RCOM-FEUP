@@ -31,20 +31,11 @@ int main(int argc, char** argv)
 	if (mode){
 		// RECEIVER
 		fd = connection(argv[1], mode);
-
-		if(fd == -1){
-			return -1;
-		}
-
 		receive_file();
 	}
 	else{
     // TRANSMITTER
     fd = connection(argv[1], mode);
-
-    if(fd == -1)
-      return -1;
-
     send_file(filename);
 	}
 

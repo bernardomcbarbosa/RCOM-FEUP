@@ -93,16 +93,17 @@ int llopen(int port, int mode){
       return -1;
     }
 
-      if(send_US(fd,UA) == -1){
+      if(send_US_frame(fd,UA) == -1){
         return -1;
       }
   }
   else{
     //TRANSMITTER
-    if(send_US(fd,SET) == -1)
+    if(send_US_frame(fd,SET) == -1){
       return -1;
+    }
 
-    read_buffer(fd,buffer,&buffer_length);
+    read_buffer(fd, buffer, &buffer_length);
     if(!is_US_UA(buffer))
       return -1;
   }
@@ -153,28 +154,30 @@ int is_REJ(unsigned char* frame){
     return 0;
 }
 
-int write_buffer(int fd, unsigned char *buffer, int buffer_length){
-  int res_total = 0,res=0;
+/* Make sure all of the buffer is sent*/
+int write_buffer(int fd, unsigned char *buffer, int buffer_size){
+  int bytes_sent, bytes_sent_total = 0;
 
- while (buffer_length > res_total) { //Make sure all buffer is sent
-   res = write(fd, buffer, buffer_length);
+  while (bytes_sent_total < buffer_size){
+    bytes_sent = write(fd, buffer, buffer_size);
 
-   if (res <= 0) {
-     return -1;
-   }
-   res_total += res;
- }
- return res_total;
+    if (bytes_sent <= 0){
+      return -1;
+    }
+    bytes_sent_total += bytes_sent;
+  }
+  return bytes_sent_total;
 }
 
+
 void read_buffer(int fd, unsigned char* buffer, int *buffer_length){
-  int i=0,res=0;
+  int i=0,res;
 
   //S1
-  while (res==0) {
+  do{
     res = read(fd,buffer,1);
-  }
-    i++;
+  }while (res==0);
+  i++;
 
   //S2
   while ((res!=0) && (buffer[0] == FLAG)) {
@@ -182,9 +185,9 @@ void read_buffer(int fd, unsigned char* buffer, int *buffer_length){
     if(buffer[i] != FLAG)
       break;
   }
+  i++;
 
   //S3
-  i++;
   while ((res!=0)) {
     res = read(fd,buffer+i,1);
     if(buffer[i] == FLAG)
@@ -195,23 +198,25 @@ void read_buffer(int fd, unsigned char* buffer, int *buffer_length){
   *buffer_length = i;
 }
 
-int send_US(int fd,int control) {
+int send_US_frame(int fd,int control) {
   unsigned char* US_msg;
   int attempts = 0;
   static int c = 0;
 
-  US_msg = (unsigned char *) malloc(5);
+  US_msg = (unsigned char *) malloc(US_frame_size);
 
   US_msg[0] = FLAG;
 
-  if(data_layer.mode == 0){
-    if(control == SET || control == DISC)
+  if(data_layer.mode){
+    //RECEIVER
+    if(control == UA || control == REJ || control == RR)
       US_msg[1] = SEND_A;
     else
       US_msg[1] = RECEIVE_A;
   }
   else{
-    if(control == UA || control == REJ || control == RR)
+    //TRANSMITTER
+    if(control == SET || control == DISC)
       US_msg[1] = SEND_A;
     else
       US_msg[1] = RECEIVE_A;
@@ -227,17 +232,18 @@ int send_US(int fd,int control) {
   US_msg[4] = FLAG;
 
   // while (attempts <= data_layer.numTransmissions + 1) {
-    if (write_buffer(fd, US_msg, 5) == -1) {
-      printf("Error writing US frame!\n");
-      return -1;
-    }
+  if (write_buffer(fd, US_msg, US_frame_size) == -1) {
+    printf("Error writing US frame!\n");
+    return -1;
+  }
+
   free(US_msg);
 
-    // alarm(data_layer.timeout);
-    //
-    // alarm(0);
-    // if (attempts > 0 && attempts < data_layer.numTransmissions)
-    //   printf("Connection failed! Retrying %d out of %d...\n",attempts, data_layer.numTransmissions);
+  // alarm(data_layer.timeout);
+  //
+  // alarm(0);
+  // if (attempts > 0 && attempts < data_layer.numTransmissions)
+  //   printf("Connection failed! Retrying %d out of %d...\n",attempts, data_layer.numTransmissions);
   // }
 
   return 0;
@@ -395,12 +401,12 @@ int llread(int fd,unsigned char* buffer, int *buffer_len){
        //send RR
        //ask again
        printf("frame duplicado\n");
-       send_US(fd,RR);
+       send_US_frame(fd,RR);
        return -1;
      }
      else{
        printf("bcc2 errado\n");
-       send_US(fd,REJ);
+       send_US_frame(fd,REJ);
        //REJ
      }
 
@@ -415,7 +421,7 @@ int llread(int fd,unsigned char* buffer, int *buffer_len){
      else{
        //correct frame
        //printf("frame correto\n");
-       send_US(fd,RR);
+       send_US_frame(fd,RR);
        c = !c;
      }
      finish = !finish;
