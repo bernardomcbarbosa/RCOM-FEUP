@@ -13,7 +13,7 @@
 
 int main(int argc, char** argv)
 {
-	int mode,fd;
+	int mode;
 	char filename[12] = "pinguim.gif";
 
   if ( (argc < 2) ||
@@ -30,12 +30,12 @@ int main(int argc, char** argv)
 
 	if (mode){
 		// RECEIVER
-		fd = connection(argv[1], mode);
+		connection(argv[1], mode);
 		receive_file();
 	}
 	else{
     // TRANSMITTER
-    fd = connection(argv[1], mode);
+    connection(argv[1], mode);
     send_file(filename);
 	}
 

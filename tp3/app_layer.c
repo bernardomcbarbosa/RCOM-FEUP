@@ -35,16 +35,15 @@ int connection(const char *port, int mode){
 }
 
 int send_file(char* filename){
-  int fi,i,st_packet_length,read_bytes=0,send_bytes=0,sequenceN=0,send_buff_len,filesize;
+  int fi, i, st_packet_length, read_bytes=0, send_bytes=0, sequenceN=0, send_buff_len, filesize;
   struct stat st;
   unsigned char fileSize[4];
   unsigned char file[252];
   unsigned char* send_buff;
 
-  fi = open(filename,O_RDONLY);
-  if(fi < 0){
-    printf("Can't open %s\n",filename);
-    return -1;
+  if ((fi = open(filename,O_RDONLY)) == -1){
+    fprintf(stderr, "Can't open %s\n", filename);
+    exit(1);
   }
 
   fstat(fi, &st);
@@ -116,10 +115,10 @@ int receive_file(){
   filename[(int) buffer[8]] = '\0';
 
   //DATA PACKETS
-  fi = open((char *) filename,O_TRUNC | O_CREAT |  O_WRONLY);
-  if(fi < 0){
-    printf("Error open %s\n",filename);
-    return -1;
+
+  if((fi=open((char *) filename,O_TRUNC | O_CREAT |  O_WRONLY))==-1){
+    fprintf(stderr, "Error open %s\n",filename);
+    exit(2);
   }
 
   ssize_t write_total = 0;
