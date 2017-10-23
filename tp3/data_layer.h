@@ -42,7 +42,7 @@ void read_buffer(int fd, unsigned char* buffer, int *buffer_length);
 
 int send_US_frame(int fd,int control);
 
-void llclose(int fd);
+int llclose(int fd);
 
 unsigned char* read_byte_destuffing(unsigned char* buff, int *buff_length);
 unsigned char* write_byte_stuffing(unsigned char* buff, int *buff_length);

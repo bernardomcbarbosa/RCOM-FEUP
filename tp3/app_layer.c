@@ -87,11 +87,15 @@ int send_file(char* filename){
     sequenceN++;
     printf("%d / %d\n",send_bytes,filesize);
   }
+  close(fi);
   //END PACKET
   start_packet[0] = END_C2;
   llwrite(serial.fileDescriptor, start_packet, st_packet_length);
 
-  llclose(serial.fileDescriptor);
+  if(llclose(serial.fileDescriptor) < 0){
+    fprintf(stderr, "Error llclose()");
+    return -1;
+  }
   return 0;
 }
 
@@ -137,6 +141,10 @@ int receive_file(){
   }
 
   close(fi);
-  llclose(serial.fileDescriptor);
+
+  if(llclose(serial.fileDescriptor) < 0){
+    fprintf(stderr, "Error llclose()");
+    return -1;
+  }
   return 0;
 }

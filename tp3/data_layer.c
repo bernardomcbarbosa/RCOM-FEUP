@@ -134,7 +134,7 @@ int is_US_UA(unsigned char* frame){
 }
 
 int is_DISC(unsigned char* frame){
-  if(frame[0] == FLAG && frame[1] == RECEIVE_A && frame[2]== DISC && ((frame[1] ^ frame[2]) == frame[3]) && frame[4] == FLAG)
+  if(frame[0] == FLAG && frame[1] == SEND_A && frame[2]== DISC && ((frame[1] ^ frame[2]) == frame[3]) && frame[4] == FLAG)
     return 1;
   else
     return 0;
@@ -209,7 +209,7 @@ int send_US_frame(int fd,int control) {
 
   if(data_layer.mode){
     //RECEIVER
-    if(control == UA || control == REJ || control == RR)
+    if(control == UA || control == REJ || control == RR || control == DISC)
       US_msg[1] = SEND_A;
     else
       US_msg[1] = RECEIVE_A;
@@ -249,8 +249,34 @@ int send_US_frame(int fd,int control) {
   return 0;
 }
 
-void llclose(int fd){
+int llclose(int fd){
+  int buff_len;
+  unsigned char buff[5];
+
+  //RECEIVER
+  if(data_layer.mode){
+    read_buffer(fd, buff, &buff_len);
+    if(!is_DISC(buff))
+      return -1;
+    else
+        printf("DISC received");
+
+    send_US_frame(fd,DISC);
+  }
+  else{
+    send_US_frame(fd,DISC);
+
+    read_buffer(fd, buff, &buff_len);
+    if(!is_DISC(buff))
+      return -1;
+    else
+      printf("DISC received");
+
+    send_US_frame(fd,UA);
+  }
+
   close(fd);
+  return 0;
 }
 
 unsigned char* read_byte_destuffing(unsigned char* buff, int *buff_length){
