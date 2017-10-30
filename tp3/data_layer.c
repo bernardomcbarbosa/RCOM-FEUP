@@ -14,22 +14,15 @@
 char BST[2] = {0x7D,0x5E};
 linkLayer data_layer;
 static int c=0; //llwrite / RR / REJ
-
-/*
-int llopen(int port, int mode)
-argumentos
-– port: COM1, COM2, ...
-– mode: TRANSMITTER / RECEIVER
-retorno
-– identificador da ligação de dados
-– valor negativo em caso de erro
-*/
+struct termios oldtio;
+unsigned int attempts = 0;
 
 int llopen(int port, int mode){
   int fd;
-  struct termios oldtio, newtio;
-  unsigned char buffer[5];
-  int buffer_length;
+  //struct termios newtio;
+  unsigned char *frame, frame_rsp[255];
+  unsigned int frame_length, frame_rsp_length;
+  attempts = 0;
 
   data_layer.mode = mode;
 
@@ -57,102 +50,307 @@ int llopen(int port, int mode){
     return -1;
   }
 
-  if (tcgetattr(fd,&oldtio) == -1) { /* save current port settings */
-    perror("tcgetattr");
+  if (setTerminalAttributes(fd) != 0) {
+    fprintf(stderr, "Error setTerminalAttributes().\n");
     return -1;
   }
 
-  bzero(&newtio, sizeof(newtio));
-  newtio.c_cflag = BAUDRATE | CS8 | CLOCAL | CREAD;
-  newtio.c_iflag = IGNPAR;
-  newtio.c_oflag = 0;
-
-  /* set input mode (non-canonical, no echo,...) */
-  newtio.c_lflag = 0;
-
-  newtio.c_cc[VTIME]    = 1;   /* inter-character timer unused */
-  newtio.c_cc[VMIN]     = 0;   /* blocking read until 5 chars received */
-
-  /*
-    VTIME e VMIN devem ser alterados de forma a proteger com um temporizador a
-    leitura do(s) pr�ximo(s) caracter(es)
-  */
-
-  tcflush(fd, TCIOFLUSH);
-
-  if (tcsetattr(fd,TCSANOW,&newtio) == -1) {
-    perror("tcsetattr");
-    exit(-1);
+  if (sigaction(SIGALRM, &data_layer.new_action, &data_layer.old_action) == -1){
+    fprintf(stderr, "Error installing SIGALRM handler\n");
+    return -1;
   }
-  //****
 
-  if (data_layer.mode){
-    //RECEIVER
-    read_buffer(fd,buffer,&buffer_length);
-    if(!is_US_SET(buffer)){
+  if (data_layer.mode == RECEIVER){
+    do{
+      read_frame(fd, frame_rsp, &frame_rsp_length);
+    }while (!is_frame_SET(frame_rsp));
+
+    frame = create_US_frame(&frame_length, UA);
+    if (write_frame(fd, frame, frame_length) == -1){
+      fprintf (stderr, "Error writing US frame!\n");
+      free(frame);
       return -1;
     }
-
-      if(send_US_frame(fd,UA) == -1){
+    free(frame);
+    return fd;
+  }
+  else if (data_layer.mode == TRANSMITTER){
+    frame = create_US_frame(&frame_length, SET);
+    while (attempts < data_layer.numTransmissions){
+      if (write_frame(fd, frame, frame_length) == -1){
+        fprintf (stderr, "Error writing US frame!\n");
+        free(frame);
         return -1;
       }
+
+      alarm(data_layer.timeout);
+
+      if(read_frame(fd, frame_rsp, &frame_rsp_length)==0){
+        attempts = 0;
+        alarm(0);
+        if(is_frame_UA(frame_rsp)){
+          return fd;
+        }
+      }
+
+      if(attempts>0 && attempts>data_layer.numTransmissions){
+        printf("Connection failed. Retrying %d out of %d...\n",
+        attempts, data_layer.numTransmissions);
+      }
+    }
+    free(frame);
+    return -1;
   }
   else{
-    //TRANSMITTER
-    if(send_US_frame(fd,SET) == -1){
-      return -1;
+    fprintf(stderr, "Invalid mode\n");
+    exit(1);
+  }
+}
+
+int llwrite(int fd, unsigned char* buffer, int length){
+    unsigned char buff[5];
+    int buff_len,ok=1;
+    while(ok){ //timeout connections
+      send_I(fd,buffer,length);
+      read_buffer(fd,buff,&buff_len);
+      if(is_frame_RR(buff)){
+        c = !c;
+        ok = 0;
+      }
+      // else if(is_US_REJ){
+      //
+      // }
     }
 
-    read_buffer(fd, buffer, &buffer_length);
-    if(!is_US_UA(buffer))
-      return -1;
+      return 0;
   }
 
-  return fd;
+int llread(int fd,unsigned char* buffer, int *buffer_len){
+  unsigned char buff[512],bcc2;
+  unsigned char* buffer_destuffed;
+  static int c = 0;
+  int buff_len;
+  int finish=0;
+
+
+  while(!finish){
+  //read buffer from tty
+  read_buffer(fd,buff,&buff_len);
+
+  //check header
+   if (is_frame_DISC(buff))
+    llclose(fd);
+
+   if(!(buff[0] == FLAG && buff[1] == SEND_A && buff[3] == (buff[1] ^ buff[2]))){
+     return -1;
+   }
+   else{
+     buff_len -= 5; // 5 == FLAG + A + C1 + BCC1 + FLAG
+   }
+
+   memcpy(buffer,buff+4,buff_len);
+
+   //destuff buffer
+   buffer_destuffed = read_byte_destuffing(buffer,&buff_len);
+
+   //check bbc2 of buffer
+   bcc2 = buffer_destuffed[buff_len-1];
+
+   if(!( bcc2 == get_bcc2(buffer_destuffed,buff_len-1) )) {
+
+     if(buff[2] != (c<<6)){
+       //duplicate frame
+       //send RR
+       //ask again
+       printf("frame duplicado\n");
+       send_US_frame(fd,RR);
+       return -1;
+     }
+     else{
+       printf("bcc2 errado\n");
+       send_US_frame(fd,REJ);
+       //REJ
+     }
+
+   }
+   else{
+
+     if(buff[2] != (c<<6)){
+       //duplicate frame
+       printf("frame duplicado e bcc2 certo\n");
+       return -1;
+     }
+     else{
+       //correct frame
+       //printf("frame correto\n");
+       send_US_frame(fd,RR);
+       c = !c;
+     }
+     finish = !finish;
+   }
+ }
+
+  *buffer_len = buff_len-1;
+  memcpy(buffer,buffer_destuffed,buff_len-1);
+  free(buffer_destuffed);
+  return 0;
 }
 
-void print_frame(unsigned char *frame,int frame_len){
-  int i;
-  printf("----------------\n");
-  for(i=0;i<frame_len;i++)
-    printf("0x%2X\n",frame[i]);
-  printf("----------------\n");
+int llclose(int fd){
+  int buff_len;
+  unsigned char buff[5];
+
+  //RECEIVER
+  if(data_layer.mode){
+    read_buffer(fd, buff, &buff_len);
+    if(!is_frame_DISC(buff))
+      return -1;
+    else
+        printf("DISC received");
+
+    send_US_frame(fd,DISC);
+  }
+  else{
+    send_US_frame(fd,DISC);
+
+    read_buffer(fd, buff, &buff_len);
+    if(!is_frame_DISC(buff))
+      return -1;
+    else
+      printf("DISC received");
+
+    send_US_frame(fd,UA);
+  }
+
+  close(fd);
+  return 0;
 }
 
-int is_US_SET(unsigned char* frame){
+int is_frame_SET(unsigned char* frame){
   if(frame[0] == FLAG && frame[1] == SEND_A && frame[2]==SET && ((frame[1] ^ frame[2]) == frame[3]) && frame[4] == FLAG)
     return 1;
   else
     return 0;
 }
 
-int is_US_UA(unsigned char* frame){
+int is_frame_UA(unsigned char* frame){
   if(frame[0] == FLAG && frame[1] == SEND_A && frame[2]==UA && ((frame[1] ^ frame[2]) == frame[3]) && frame[4] == FLAG)
     return 1;
   else
     return 0;
 }
 
-int is_DISC(unsigned char* frame){
+int is_frame_DISC(unsigned char* frame){
   if(frame[0] == FLAG && frame[1] == SEND_A && frame[2]== DISC && ((frame[1] ^ frame[2]) == frame[3]) && frame[4] == FLAG)
     return 1;
   else
     return 0;
 }
 
-int is_RR(unsigned char* frame){
+int is_frame_RR(unsigned char* frame){
   if(frame[0] == FLAG && frame[1] == SEND_A && frame[2]== (c << 7 | RR) && ((frame[1] ^ frame[2]) == frame[3]) && frame[4] == FLAG)
     return 1;
   else
     return 0;
 }
 
-int is_REJ(unsigned char* frame){
+int is_frame_REJ(unsigned char* frame){
   if(frame[0] == FLAG && frame[1] == SEND_A && frame[2]== (c << 7 | REJ) && ((frame[1] ^ frame[2]) == frame[3]) && frame[4] == FLAG)
     return 1;
   else
     return 0;
 }
+
+int write_frame(int fd, unsigned char *frame, unsigned int frame_length){
+  int bytes_sent, bytes_sent_total = 0;
+
+  while (bytes_sent_total < frame_length){
+    bytes_sent = write(fd, frame, frame_length);
+
+    if (bytes_sent <= 0){
+      return -1;
+    }
+    bytes_sent_total += bytes_sent;
+  }
+  return bytes_sent_total;
+}
+
+int read_frame (int fd, unsigned char *frame, unsigned int *frame_length){
+  unsigned int first_flag=0, end_of_frame=0;
+  char buf;
+  *frame_length = 0;
+
+  while (!end_of_frame){
+    if (read(fd, &buf, 1)>0){
+      if (buf == FLAG){
+        if(!first_flag){
+          //if the first flag hasn't been read yet
+          first_flag = 1;
+        }
+        else if (first_flag){
+          //reading the second flag
+          end_of_frame = 1;
+        }
+
+        frame[*frame_length] = buf;
+        (*frame_length)++;
+      }
+      else{
+        //If the char is not a flag and
+        //the final flag has not been found
+        //then add it to the frame.
+        if(first_flag){
+          frame[*frame_length]=buf;
+          (*frame_length)++;
+        }
+      }
+    }
+    else{
+      printf("timeout?");
+      return -1; //usually caused by a timeout
+    }
+  }
+
+  return 0;
+}
+
+unsigned char *create_US_frame(unsigned int *frame_length, int control_byte){
+  static int c = 0;
+  unsigned char *US_frame = (unsigned char *) malloc(US_FRAME_LENGTH * sizeof(char));
+
+  US_frame[0] = FLAG;
+
+  if(data_layer.mode == RECEIVER){
+    if(control_byte == UA || control_byte == REJ || control_byte == RR || control_byte == DISC)
+      US_frame[1] = SEND_A;
+    else
+      US_frame[1] = RECEIVE_A;
+  }
+  else if (data_layer.mode == TRANSMITTER){
+    if(control_byte == SET || control_byte == DISC)
+      US_frame[1] = SEND_A;
+    else
+      US_frame[1] = RECEIVE_A;
+  }
+  else{
+    fprintf(stderr, "Invalid mode\n");
+    exit(1);
+  }
+
+  if (control_byte == REJ || control_byte == RR) {
+    US_frame[2] = c << 7 | control_byte;
+    c = !c;
+  } else
+    US_frame[2] = control_byte;
+
+  US_frame[3] = US_frame[1] ^ US_frame[2];
+  US_frame[4] = FLAG;
+
+  *frame_length = US_FRAME_LENGTH;
+  return US_frame;
+}
+
+
 
 /* Make sure all of the buffer is sent*/
 int write_buffer(int fd, unsigned char *buffer, int buffer_size){
@@ -200,10 +398,9 @@ void read_buffer(int fd, unsigned char* buffer, int *buffer_length){
 
 int send_US_frame(int fd,int control) {
   unsigned char* US_msg;
-  int attempts = 0;
   static int c = 0;
 
-  US_msg = (unsigned char *) malloc(US_frame_size);
+  US_msg = (unsigned char *) malloc( sizeof(char)*US_FRAME_LENGTH);
 
   US_msg[0] = FLAG;
 
@@ -232,7 +429,7 @@ int send_US_frame(int fd,int control) {
   US_msg[4] = FLAG;
 
   // while (attempts <= data_layer.numTransmissions + 1) {
-  if (write_buffer(fd, US_msg, US_frame_size) == -1) {
+  if (write_buffer(fd, US_msg, US_FRAME_LENGTH) == -1) {
     printf("Error writing US frame!\n");
     return -1;
   }
@@ -246,36 +443,6 @@ int send_US_frame(int fd,int control) {
   //   printf("Connection failed! Retrying %d out of %d...\n",attempts, data_layer.numTransmissions);
   // }asd
 
-  return 0;
-}
-
-int llclose(int fd){
-  int buff_len;
-  unsigned char buff[5];
-
-  //RECEIVER
-  if(data_layer.mode){
-    read_buffer(fd, buff, &buff_len);
-    if(!is_DISC(buff))
-      return -1;
-    else
-        printf("DISC received");
-
-    send_US_frame(fd,DISC);
-  }
-  else{
-    send_US_frame(fd,DISC);
-
-    read_buffer(fd, buff, &buff_len);
-    if(!is_DISC(buff))
-      return -1;
-    else
-      printf("DISC received");
-
-    send_US_frame(fd,UA);
-  }
-
-  close(fd);
   return 0;
 }
 
@@ -371,91 +538,48 @@ int send_I(int fd,unsigned char *buffer, int length){
   return write_buffer(fd,final_buff,final_len);
 }
 
-int llwrite(int fd, unsigned char* buffer, int length){
-    unsigned char buff[5];
-    int buff_len,ok=1;
-    while(ok){ //timeout connections
-      send_I(fd,buffer,length);
-      read_buffer(fd,buff,&buff_len);
-      if(is_RR(buff)){
-        c = !c;
-        ok = 0;
-      }
-      // else if(is_US_REJ){
-      //
-      // }
-    }
+int setTerminalAttributes(int fd) {
+  struct termios newtio;
 
-      return 0;
+  if (tcgetattr(fd, &oldtio) == -1) {
+    /* save current port settings */
+    perror("tcgetattr");
+    close(fd);
+    return -1;
   }
 
-int llread(int fd,unsigned char* buffer, int *buffer_len){
-  unsigned char buff[512],bcc2;
-  unsigned char* buffer_destuffed;
-  static int c = 0;
-  int buff_len;
-  int finish=0;
+  bzero(&newtio, sizeof(newtio));
+  newtio.c_cflag = BAUDRATE | CS8 | CLOCAL | CREAD;
+  newtio.c_iflag = IGNPAR;
+  newtio.c_oflag = 0;
 
+  /* set input mode (non-canonical, no echo,...) */
+  newtio.c_lflag = 0;
 
-  while(!finish){
-  //read buffer from tty
-  read_buffer(fd,buff,&buff_len);
+  newtio.c_cc[VTIME]    = 0;   /* inter-character timer unused */
+  newtio.c_cc[VMIN]     = 1;   /* blocking read until 5 chars received */
 
-  //check header
-   if (is_DISC(buff))
-    llclose(fd);
+  tcflush(fd, TCIOFLUSH);
 
-   if(!(buff[0] == FLAG && buff[1] == SEND_A && buff[3] == (buff[1] ^ buff[2]))){
-     return -1;
-   }
-   else{
-     buff_len -= 5; // 5 == FLAG + A + C1 + BCC1 + FLAG
-   }
+  if (tcsetattr(fd, TCSANOW, &newtio) == -1) {
+    perror("tcsetattr");
+    close (fd);
+    return -1;
+  }
 
-   memcpy(buffer,buff+4,buff_len);
-
-   //destuff buffer
-   buffer_destuffed = read_byte_destuffing(buffer,&buff_len);
-
-   //check bbc2 of buffer
-   bcc2 = buffer_destuffed[buff_len-1];
-
-   if(!( bcc2 == get_bcc2(buffer_destuffed,buff_len-1) )) {
-
-     if(buff[2] != (c<<6)){
-       //duplicate frame
-       //send RR
-       //ask again
-       printf("frame duplicado\n");
-       send_US_frame(fd,RR);
-       return -1;
-     }
-     else{
-       printf("bcc2 errado\n");
-       send_US_frame(fd,REJ);
-       //REJ
-     }
-
-   }
-   else{
-
-     if(buff[2] != (c<<6)){
-       //duplicate frame
-       printf("frame duplicado e bcc2 certo\n");
-       return -1;
-     }
-     else{
-       //correct frame
-       //printf("frame correto\n");
-       send_US_frame(fd,RR);
-       c = !c;
-     }
-     finish = !finish;
-   }
- }
-
-  *buffer_len = buff_len-1;
-  memcpy(buffer,buffer_destuffed,buff_len-1);
-  free(buffer_destuffed);
   return 0;
+}
+
+void setTimeOutSettings(unsigned int timeout, unsigned int retries){
+  data_layer.timeout = timeout;
+  data_layer.numTransmissions = retries;
+
+  data_layer.new_action.sa_handler = timeout_handler;
+  data_layer.new_action.sa_flags &= !SA_RESTART; //stop the primitives functions (like read or write)
+}
+
+void timeout_handler(int signum){
+  attempts++;
+  printf ("%d", attempts);
+  printf ("entrou no handler\n");
 }

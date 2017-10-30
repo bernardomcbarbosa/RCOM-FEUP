@@ -1,3 +1,4 @@
+
 #include <stdio.h>
 #include <fcntl.h>
 #include <signal.h>
@@ -10,6 +11,22 @@
 
 #include "app_layer.h"
 #include "data_layer.h"
+
+void getParameters(){
+	unsigned int timeout, retries;
+
+	do{
+		printf("Set timeout timer [0,...,5]: ");
+		scanf("%u", &timeout);
+	}while(timeout<=0 && timeout>5);
+
+	do{
+		printf("Number of times to retry on timeout [0,...,5]: ");
+		scanf("%u", &retries);
+	}while(retries<=0 && retries>5);
+
+	setTimeOutSettings(timeout, retries);
+}
 
 int main(int argc, char** argv)
 {
@@ -28,6 +45,7 @@ int main(int argc, char** argv)
 		scanf("%d", &mode);
 	}while (mode != 0 && mode != 1);
 
+	getParameters();
 	if (mode){
 		// RECEIVER
 		connection(argv[1], mode);
@@ -38,6 +56,5 @@ int main(int argc, char** argv)
     connection(argv[1], mode);
     send_file(filename);
 	}
-
   return 0;
 }
