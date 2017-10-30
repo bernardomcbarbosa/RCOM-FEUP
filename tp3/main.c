@@ -13,17 +13,17 @@
 #include "data_layer.h"
 
 void getParameters(){
-	unsigned int timeout, retries;
+	unsigned int timeout=0, retries;
 
 	do{
 		printf("Set timeout timer [0,...,5]: ");
 		scanf("%u", &timeout);
-	}while(timeout<=0 && timeout>5);
+	}while(timeout<=0 || timeout>=5);
 
 	do{
 		printf("Number of times to retry on timeout [0,...,5]: ");
 		scanf("%u", &retries);
-	}while(retries<=0 && retries>5);
+	}while(retries<=0 || retries>=5);
 
 	setTimeOutSettings(timeout, retries);
 }

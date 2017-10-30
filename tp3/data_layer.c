@@ -154,7 +154,7 @@ int llread(int fd, unsigned char *data_packet, unsigned int *data_packet_length)
   unsigned char frame_rsp[512], expected_bcc2;
   unsigned char* data_packet_destuffed, *frame;
   unsigned int frame_rsp_length, frame_length, data_packet_destuffed_length;
-  int read_succesful=0;
+  int read_succesful=0, sig=0;
   static int c = 0;
 
   while(!read_succesful){
@@ -188,7 +188,7 @@ int llread(int fd, unsigned char *data_packet, unsigned int *data_packet_length)
         }
         else{
           printf("Found duplicate frame with correct bcc2. Discarding...\n");
-          *data_packet_length = 0;
+          sig = 1;
         }
         read_succesful = 1;
       }
@@ -201,7 +201,7 @@ int llread(int fd, unsigned char *data_packet, unsigned int *data_packet_length)
         else{
           frame = create_US_frame(&frame_length, RR);
           printf("Found duplicate frame. Discarding...\n");
-          *data_packet_length = 0;
+          sig = 1;
           read_succesful = 1;
         }
       }
@@ -216,8 +216,14 @@ int llread(int fd, unsigned char *data_packet, unsigned int *data_packet_length)
   }
   free(frame);
 
-  *data_packet_length = data_packet_destuffed_length-1;
-  memcpy(data_packet, data_packet_destuffed, data_packet_destuffed_length-1);
+  if (!sig){
+    *data_packet_length = data_packet_destuffed_length-1;
+    memcpy(data_packet, data_packet_destuffed, data_packet_destuffed_length-1);
+  }
+  else{
+    *data_packet_length = 0;
+  }
+
   free(data_packet_destuffed);
   return 0;
 }
