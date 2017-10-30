@@ -244,7 +244,7 @@ int send_US_frame(int fd,int control) {
   // alarm(0);
   // if (attempts > 0 && attempts < data_layer.numTransmissions)
   //   printf("Connection failed! Retrying %d out of %d...\n",attempts, data_layer.numTransmissions);
-  // }
+  // }asd
 
   return 0;
 }
