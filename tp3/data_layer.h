@@ -99,6 +99,7 @@ unsigned char* write_byte_stuffing(unsigned char* buff, unsigned int *buff_lengt
 unsigned char get_bcc2(unsigned char *pack, unsigned int pack_len);
 
 int setTerminalAttributes(int fd);
+int resetSettings(int fd);
 
 void setTimeOutSettings(unsigned int timeout, unsigned int retries);
 void timeout_handler(int signum);

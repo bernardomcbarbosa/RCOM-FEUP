@@ -68,6 +68,7 @@ int llopen(int port, int mode){
     frame = create_US_frame(&frame_length, UA);
     if (write_frame(fd, frame, frame_length) == -1){
       fprintf (stderr, "Error writing US frame!\n");
+      resetSettings(fd);
       free(frame);
       return -1;
     }
@@ -79,6 +80,7 @@ int llopen(int port, int mode){
     while (attempts < data_layer.numTransmissions){
       if (write_frame(fd, frame, frame_length) == -1){
         fprintf (stderr, "Error writing US frame!\n");
+        resetSettings(fd);
         free(frame);
         return -1;
       }
@@ -94,12 +96,13 @@ int llopen(int port, int mode){
         }
       }
 
-      if(attempts>0 && attempts>data_layer.numTransmissions){
+      if(attempts>0 && attempts<data_layer.numTransmissions){
         printf("Connection failed. Retrying %d out of %d...\n",
         attempts, data_layer.numTransmissions);
       }
     }
     printf("Connection timed out\n");
+    resetSettings(fd);
     free(frame);
     return -1;
   }
@@ -117,6 +120,7 @@ int llwrite(int fd, unsigned char* data_packet, unsigned int data_packet_length)
   while(attempts < data_layer.numTransmissions){
     if(write_frame(fd, frame, frame_length) == -1){
       fprintf (stderr, "Error writing US frame!\n");
+      resetSettings(fd);
       free(frame);
       return -1;
     }
@@ -135,12 +139,13 @@ int llwrite(int fd, unsigned char* data_packet, unsigned int data_packet_length)
     }
 
     alarm(0);
-    if(attempts>0 && attempts>data_layer.numTransmissions){
+    if(attempts>0 && attempts<data_layer.numTransmissions){
       printf("Connection failed. Retrying %d out of %d...\n",
       attempts, data_layer.numTransmissions);
     }
   }
   printf("Connection timed out\n");
+  resetSettings(fd);
   free(frame);
   return -1;
 }
@@ -204,6 +209,7 @@ int llread(int fd, unsigned char *data_packet, unsigned int *data_packet_length)
 
     if (write_frame(fd, frame, frame_length) == -1){
       fprintf (stderr, "Error writing US frame!\n");
+      resetSettings(fd);
       free(frame);
       return -1;
     }
@@ -229,11 +235,14 @@ int llclose(int fd){
     frame = create_US_frame(&frame_length, DISC);
     if (write_frame(fd, frame, frame_length) == -1){
       fprintf (stderr, "Error writing US frame!\n");
+      resetSettings(fd);
       free(frame);
       return -1;
     }
-
+    resetSettings(fd);
     free(frame);
+
+    printf ("Receiver finished \n");
     return 1;
   }
   else if(data_layer.mode == TRANSMITTER){
@@ -241,6 +250,7 @@ int llclose(int fd){
     while (attempts < data_layer.numTransmissions){
       if (write_frame(fd, frame, frame_length) == -1){
         fprintf (stderr, "Error writing US frame!\n");
+        resetSettings(fd);
         free(frame);
         return -1;
       }
@@ -251,27 +261,29 @@ int llclose(int fd){
         attempts = 0;
         alarm(0);
         if(is_frame_DISC(frame_rsp)){
-          printf("DISC received\n");
           //Received DISC so we send UA
           frame = create_US_frame(&frame_length, UA);
           if (write_frame(fd, frame, frame_length) == -1){
             fprintf (stderr, "Error writing US frame!\n");
+            resetSettings(fd);
             free(frame);
             return -1;
           }
           free(frame);
-          close(fd);
+          resetSettings(fd);
+          printf ("Transmitter finished \n");
           return 1;
         }
       }
 
       alarm(0);
-      if(attempts>0 && attempts>data_layer.numTransmissions){
+      if(attempts>0 && attempts<data_layer.numTransmissions){
         printf("Connection failed. Retrying %d out of %d...\n",
         attempts, data_layer.numTransmissions);
       }
     }
     printf("Connection timed out\n");
+    resetSettings(fd);
     free(frame);
     return -1;
   }
@@ -375,7 +387,6 @@ int read_frame (int fd, unsigned char *frame, unsigned int *frame_length){
       }
     }
     else{
-      printf("timeout?");
       return -1; //usually caused by a timeout
     }
   }
@@ -542,6 +553,24 @@ int setTerminalAttributes(int fd) {
   }
 
   return 0;
+}
+
+int resetSettings(int fd) {
+  if (sigaction(SIGALRM, &data_layer.old_action, NULL) == -1){
+    printf("Error setting SIGALRM handler to original.\n");
+  }
+
+  if (tcsetattr(fd, TCSANOW, &oldtio) == -1){
+    printf("Error settings old port settings.\n");
+  }
+
+  if (close(fd)) {
+    printf("Error closing terminal file descriptor.\n");
+    return -1;
+  }
+
+  return 0;
+
 }
 
 void setTimeOutSettings(unsigned int timeout, unsigned int retries){

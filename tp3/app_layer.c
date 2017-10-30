@@ -66,6 +66,8 @@ int send_file(char* filename){
 
   llwrite(serial.fileDescriptor, start_packet, st_packet_length);
 
+  printf ("Sending data . . .\n");
+
   //DATA
   filesize = (int) file_size;
   send_buff = (unsigned char *)malloc(256);
@@ -86,7 +88,7 @@ int send_file(char* filename){
 
     send_bytes += read_bytes;
     sequenceN++;
-    printf("%d / %d\n",send_bytes,filesize);
+    printf("Sent : %d ; Out of :%d\n",send_bytes,filesize);
   }
   close(fi);
   //END PACKET
@@ -139,7 +141,7 @@ int receive_file(){
       write_total += write(fd,buffer+4,read_bytes);
       sequenceN++;
 
-      printf("%ld / %ld\n",write_total,fileSize);
+      printf("Received : %ld ; Expected : %ld\n",write_total,fileSize);
     }
 
     if (llread(serial.fileDescriptor, buffer, &buffer_len) != 0) {
