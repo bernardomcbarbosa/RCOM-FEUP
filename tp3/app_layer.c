@@ -106,9 +106,7 @@ int receive_file(){
   unsigned buffer_len;
 
   //START PACKET
-  printf ("1 - receive_file\n");
   res = llread(serial.fileDescriptor,buffer,&buffer_len);
-  printf ("2 - receive_file\n");
   while (res != 0 || buffer[0] != START_C2){
     res = llread(serial.fileDescriptor,buffer,&buffer_len);
   }

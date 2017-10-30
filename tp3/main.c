@@ -46,17 +46,19 @@ int main(int argc, char** argv)
 	}while (mode != 0 && mode != 1);
 
 	getParameters();
-	if (mode){
-		// RECEIVER
+	if (mode == RECEIVER){
 		connection(argv[1], mode);
 		receive_file();
 	}
-	else{
+	else if (mode == TRANSMITTER){
     // TRANSMITTER
     connection(argv[1], mode);
     send_file(filename);
 	}
+	else{
+		fprintf(stderr, "Invalid mode\n");
+		exit(1);
+	}
 
-	
   return 0;
 }

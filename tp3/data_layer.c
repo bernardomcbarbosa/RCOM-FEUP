@@ -89,6 +89,7 @@ int llopen(int port, int mode){
         attempts = 0;
         alarm(0);
         if(is_frame_UA(frame_rsp)){
+          free(frame);
           return fd;
         }
       }
@@ -98,6 +99,7 @@ int llopen(int port, int mode){
         attempts, data_layer.numTransmissions);
       }
     }
+    printf("Connection timed out\n");
     free(frame);
     return -1;
   }
@@ -110,8 +112,8 @@ int llopen(int port, int mode){
 int llwrite(int fd, unsigned char* data_packet, unsigned int data_packet_length){
   unsigned int frame_length, frame_rsp_length;
   unsigned char *frame, frame_rsp[255];
-  frame = create_I_frame(&frame_length, data_packet, data_packet_length);
 
+  frame = create_I_frame(&frame_length, data_packet, data_packet_length);
   while(attempts < data_layer.numTransmissions){
     if(write_frame(fd, frame, frame_length) == -1){
       fprintf (stderr, "Error writing US frame!\n");
@@ -130,7 +132,6 @@ int llwrite(int fd, unsigned char* data_packet, unsigned int data_packet_length)
         return 0; //num caracteres escritos
       }
       //If we get a REJ frame it will just resend the I frame
-
     }
 
     alarm(0);
@@ -139,89 +140,115 @@ int llwrite(int fd, unsigned char* data_packet, unsigned int data_packet_length)
       attempts, data_layer.numTransmissions);
     }
   }
-
+  printf("Connection timed out\n");
   free(frame);
   return -1;
 }
 
 int llread(int fd, unsigned char *data_packet, unsigned int *data_packet_length){
-  unsigned char frame_rsp[512], bcc2;
+  unsigned char frame_rsp[512], expected_bcc2;
   unsigned char* data_packet_destuffed, *frame;
   unsigned int frame_rsp_length, frame_length, data_packet_destuffed_length;
-  int finish=0;
+  int read_succesful=0;
   static int c = 0;
 
-  while(!finish){
+  while(!read_succesful){
     read_frame(fd, frame_rsp, &frame_rsp_length);
 
     if (is_frame_DISC(frame_rsp)){
       llclose(fd);
     }
 
-    //verify I header
-    if(!(frame_rsp[0] == FLAG && frame_rsp[1] == SEND_A && frame_rsp[3] == (frame_rsp[1] ^ frame_rsp[2]))){
-      return -1;
+    if(!is_I_frame_header_valid(frame_rsp, frame_rsp_length)){
+      printf("Invalid frame header. Rejecting frame..\n");
+      frame = create_US_frame(&frame_length, REJ);
     }
     else{
       frame_rsp_length -= I_FRAME_HEADER_SIZE;
-    }
 
-    memcpy(data_packet, frame_rsp+4, frame_rsp_length);
+      memcpy(data_packet, frame_rsp+4, frame_rsp_length);
 
-    data_packet_destuffed_length = frame_rsp_length;
-    data_packet_destuffed = read_byte_destuffing(data_packet, &data_packet_destuffed_length);
-    //check bbc2 of destuffed data packet
-    bcc2 = data_packet_destuffed[data_packet_destuffed_length-1];
+      data_packet_destuffed_length = frame_rsp_length;
+      data_packet_destuffed = read_byte_destuffing(data_packet, &data_packet_destuffed_length);
+      //check bbc2 of destuffed data packet
+      expected_bcc2 = data_packet_destuffed[data_packet_destuffed_length-1];
 
-    if(!(bcc2 == get_bcc2(data_packet_destuffed, data_packet_destuffed_length-1))) {
-      if(frame_rsp[2] != (c<<6)){
-        printf("Found duplicate frame. Discarding...\n");
+      if((expected_bcc2 == get_bcc2(data_packet_destuffed, data_packet_destuffed_length-1))){
+        //Valid bcc2 - might still be a duplicate frame
         frame = create_US_frame(&frame_length, RR);
-        if (write_frame(fd, frame, frame_length) == -1){
-          fprintf (stderr, "Error writing US frame!\n");
-          free(frame);
-          return -1;
+
+        if(is_I_frame_sequence_number_valid(frame_rsp[2], c)){
+          //Correct frame
+          c = !c;
         }
-        free(frame);
-        return -1;
+        else{
+          printf("Found duplicate frame with correct bcc2. Discarding...\n");
+          *data_packet_length = 0;
+        }
+        read_succesful = 1;
       }
       else{
-        printf("Found new incorrect frame. Rejecting...\n");
-        frame = create_US_frame(&frame_length, REJ);
-        if (write_frame(fd, frame, frame_length) == -1){
-          fprintf (stderr, "Error writing US frame!\n");
-          free(frame);
-          return -1;
+        //Invalid bcc2
+        if(is_I_frame_sequence_number_valid(frame_rsp[2], c)){
+          frame = create_US_frame(&frame_length, REJ);
+          printf("Found new incorrect frame. Rejecting...\n");
         }
-        free(frame);
+        else{
+          frame = create_US_frame(&frame_length, RR);
+          printf("Found duplicate frame. Discarding...\n");
+          *data_packet_length = 0;
+          read_succesful = 1;
+        }
       }
-
     }
-    else{
-      if(frame_rsp[2] != (c<<6)){
-        printf("Found duplicate frame with correct bcc2. Discarding...\n");
-        return -1;
-      }
-      else{
-        //correct frame
-        frame = create_US_frame(&frame_length, RR);
-        if (write_frame(fd, frame, frame_length) == -1){
-          fprintf (stderr, "Error writing US frame!\n");
-          free(frame);
-          return -1;
-        }
-        free(frame);
-        c = !c;
-      }
-      finish = !finish;
+
+    if (write_frame(fd, frame, frame_length) == -1){
+      fprintf (stderr, "Error writing US frame!\n");
+      free(frame);
+      return -1;
     }
   }
+  free(frame);
 
   *data_packet_length = data_packet_destuffed_length-1;
   memcpy(data_packet, data_packet_destuffed, data_packet_destuffed_length-1);
   free(data_packet_destuffed);
   return 0;
 }
+/*
+      if(!(expected_bcc2 == get_bcc2(data_packet_destuffed, data_packet_destuffed_length-1))){
+        //invalid bcc
+        if(frame_rsp[2] != (c<<6)){
+          printf("Found duplicate frame. Discarding...\n");
+          frame = create_US_frame(&frame_length, RR);
+        }
+        else{
+          printf("Found new incorrect frame. Rejecting...\n");
+          frame = create_US_frame(&frame_length, REJ);
+        }
+      }
+      else{
+        //valid bcc
+        frame = create_US_frame(&frame_length, RR);
+        if(frame_rsp[2] != (c<<6)){
+          printf("Found duplicate frame with correct bcc2. Discarding...\n");
+        }
+        else{
+          //correct frame
+          c = !c;
+        }
+        read_succesful = !read_succesful;
+      }
+    }
+
+    if (write_frame(fd, frame, frame_length) == -1){
+      fprintf (stderr, "Error writing US frame!\n");
+      free(frame);
+      return -1;
+    }
+  }
+  */
+
 
 int llclose(int fd){
   unsigned char *frame, frame_rsp[255];
@@ -233,14 +260,13 @@ int llclose(int fd){
       read_frame(fd, frame_rsp, &frame_rsp_length);
     }while (!is_frame_DISC(frame_rsp));
 
-    printf("DISC received\n");
-
     frame = create_US_frame(&frame_length, DISC);
     if (write_frame(fd, frame, frame_length) == -1){
       fprintf (stderr, "Error writing US frame!\n");
       free(frame);
       return -1;
     }
+
     free(frame);
     return 1;
   }
@@ -267,6 +293,7 @@ int llclose(int fd){
             free(frame);
             return -1;
           }
+          free(frame);
           close(fd);
           return 1;
         }
@@ -278,7 +305,7 @@ int llclose(int fd){
         attempts, data_layer.numTransmissions);
       }
     }
-
+    printf("Connection timed out\n");
     free(frame);
     return -1;
   }
@@ -322,6 +349,19 @@ int is_frame_REJ(unsigned char* frame){
     return 1;
   else
     return 0;
+}
+
+int is_I_frame_header_valid(unsigned char *frame, unsigned int frame_len){
+  if (frame_len < 6){
+      return 0;
+  }
+
+  return (frame[0] == FLAG && frame[1] == SEND_A &&
+         frame[3] == (frame[1] ^ frame[2]));
+}
+
+int is_I_frame_sequence_number_valid(unsigned char control_byte, int c){
+  return (control_byte == (c << 6));
 }
 
 int write_frame(int fd, unsigned char *frame, unsigned int frame_length){
@@ -548,6 +588,4 @@ void setTimeOutSettings(unsigned int timeout, unsigned int retries){
 
 void timeout_handler(int signum){
   attempts++;
-  printf ("%d", attempts);
-  printf ("entrou no handler\n");
 }

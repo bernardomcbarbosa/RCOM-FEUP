@@ -84,6 +84,8 @@ int is_frame_UA(unsigned char* frame);
 int is_frame_DISC(unsigned char* frame);
 int is_frame_RR(unsigned char* frame);
 int is_frame_REJ(unsigned char* frame);
+int is_I_frame_header_valid(unsigned char *frame, unsigned int frame_len);
+int is_I_frame_sequence_number_valid(unsigned char control_byte, int c);
 
 int write_frame(int fd, unsigned char *frame, unsigned int frame_length);
 int read_frame (int fd, unsigned char* frame, unsigned int *frame_length);
