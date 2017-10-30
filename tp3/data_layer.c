@@ -167,6 +167,8 @@ int llread(int fd, unsigned char *data_packet, unsigned int *data_packet_length)
     if(!is_I_frame_header_valid(frame_rsp, frame_rsp_length)){
       printf("Invalid frame header. Rejecting frame..\n");
       frame = create_US_frame(&frame_length, REJ);
+      sig = 1;
+      read_succesful = 1;
     }
     else{
       frame_rsp_length -= I_FRAME_HEADER_SIZE;
