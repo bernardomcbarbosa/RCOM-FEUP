@@ -35,9 +35,8 @@ int connection(const char *port, int mode){
 }
 
 int send_file(char* filename){
-  int fi, i, read_bytes=0, send_bytes=0, sequenceN=0, send_buff_len, filesize;
+  int fi, read_bytes=0, send_bytes=0, sequenceN=0, send_buff_len, filesize;
   struct stat st;
-  unsigned char fileSize[4];
   unsigned char file[252];
   unsigned char* send_buff;
   unsigned int st_packet_length;
@@ -48,26 +47,27 @@ int send_file(char* filename){
   }
 
   fstat(fi, &st);
-  off_t size = st.st_size;
+  off_t file_size = st.st_size;
+  mode_t file_mode = st.st_mode;
 
   //START PACKET
-  st_packet_length = 7 + (1+1+strlen(filename));
-  unsigned char* start_packet = (unsigned char *)malloc(st_packet_length);
+  st_packet_length = 7 + sizeof(mode_t) + (sizeof(st.st_size) + strlen(filename));
+  unsigned char* start_packet = (unsigned char *)malloc(sizeof(char) * st_packet_length);
   start_packet[0] = START_C2;
-  start_packet[1] = FILE_SIZE;
-  start_packet[2] = 0x04;
-  for (i = 0; i < 4; i++) {
-        fileSize[i] = (unsigned char) (size>>(8*i) % 256);
-  }
-  strcat((char *) start_packet+3, (char *) fileSize);
-  start_packet[7]= FILE_NAME;
-  start_packet[8] = (unsigned char) strlen(filename);
-  strcat((char *) start_packet+9, (char *) filename);
+  start_packet[1] = FILE_PERMISSIONS;
+  start_packet[2] = sizeof(mode_t);
+  *((mode_t *)(start_packet + 3)) = file_mode;
+  start_packet[3 + sizeof(mode_t)] = FILE_SIZE;
+  start_packet[4 + sizeof(mode_t)] = sizeof(st.st_size);
+  *((off_t *)(start_packet + 5 + sizeof(mode_t))) = file_size;
+  start_packet[5 + sizeof(mode_t) + sizeof(st.st_size)] = FILE_NAME;
+  start_packet[6 + sizeof(mode_t) + sizeof(st.st_size)] = strlen(filename);
+  strcat((char*) start_packet + 7 + sizeof(mode_t) + sizeof(st.st_size), filename);
 
   llwrite(serial.fileDescriptor, start_packet, st_packet_length);
 
   //DATA
-  filesize = (int) size;
+  filesize = (int) file_size;
   send_buff = (unsigned char *)malloc(256);
   while(send_bytes < filesize){
     read_bytes = read(fi, file, 252); // 256 - (C2+N+L1+L2)
@@ -101,52 +101,103 @@ int send_file(char* filename){
 }
 
 int receive_file(){
-  unsigned char buffer[256],filename[50],read_bytes=0,sequenceN=0;
-  int res,filesize=0,fi;
+  unsigned char buffer[256], read_bytes=0, sequenceN=0;
+  int fd;
   unsigned buffer_len;
 
   //START PACKET
-  res = llread(serial.fileDescriptor,buffer,&buffer_len);
-  while (res != 0 || buffer[0] != START_C2){
-    res = llread(serial.fileDescriptor,buffer,&buffer_len);
-  }
-  //filesize
-  for (unsigned int i = 3; i < 7; i++) {
-        filesize += (int) (buffer[i]<<(8*(i-3)));
-  }
-  //filename
-  for (unsigned int i = 9; i < buffer_len; i++) {
-    filename[i-9] = buffer[i];
-  }
-  filename[(int) buffer[8]] = '\0';
+  do{
+    if (llread(serial.fileDescriptor,buffer,&buffer_len) < 0){
+      fprintf(stderr, "Error llread()\n");
+      exit(-1);
+    }
+  } while (buffer_len == 0 || buffer[0] != START_C2);
+
+  printf ("Receiving data . . .\n");
+
+  off_t fileSize = get_file_size(buffer, buffer_len);
+  char *filename = get_file_name(buffer, buffer_len);
+  mode_t file_mode = get_file_permissions(buffer, buffer_len);
 
   //DATA PACKETS
 
-  if((fi=open((char *) filename,O_TRUNC | O_CREAT |  O_WRONLY))==-1){
-    fprintf(stderr, "Error open %s\n",filename);
+  if((fd=open((char *) filename,O_TRUNC | O_CREAT |  O_WRONLY))==-1){
+    fprintf(stderr, "Error opening %s\n",filename);
     exit(2);
   }
 
   ssize_t write_total = 0;
-  while (res != 0 || buffer[0] != END_C2){
-    res = llread(serial.fileDescriptor,buffer,&buffer_len);
-    if(res != 0)
-      continue;
-    if((int) buffer[1] == n(sequenceN)){
+  if (llread(serial.fileDescriptor, buffer, &buffer_len) != 0) {
+    printf("Error llread() in function receive_data().\n");
+    close(fd);
+    exit(-1);
+  }
+
+  while (buffer_len == 0 || buffer[0] != END_C2){
+    if (buffer_len > 0 && buffer[1] == n(sequenceN)){
       read_bytes = buffer_len - 4;
-      //read_bytes == (int)buffer[2]*256 + (int)buffer[3])
-      write_total += write(fi,buffer+4,read_bytes);
+      write_total += write(fd,buffer+4,read_bytes);
       sequenceN++;
 
-      printf("%ld / %d\n",write_total,filesize);
+      printf("%ld / %ld\n",write_total,fileSize);
+    }
+
+    if (llread(serial.fileDescriptor, buffer, &buffer_len) != 0) {
+      printf("Error llread() in function receive_data().\n");
+      close(fd);
+      exit(-1);
     }
   }
 
-  close(fi);
+
+  close(fd);
 
   if(llclose(serial.fileDescriptor) < 0){
     fprintf(stderr, "Error llclose()");
     return -1;
   }
+
+  chmod(filename, file_mode);
   return 0;
+}
+
+off_t get_file_size(unsigned char *buffer, int buffer_len){
+  int i = 1;
+  while (i < buffer_len) {
+    if (buffer[i] == FILE_SIZE)
+      return *((off_t *)(buffer + i + 2));
+
+    i += 2 + buffer[i + 1];
+  }
+
+  return 0;
+}
+
+char *get_file_name(unsigned char *buffer, int buffer_len){
+  int i = 1;
+  while (i < buffer_len) {
+    if (buffer[i] == FILE_NAME) {
+      char *file_name = (char *)malloc((buffer[i + 1] + 1) * sizeof(char));
+      memcpy(file_name, buffer + i + 2, buffer[i + 1]);
+      file_name[(buffer[i + 1] + 1)] = 0;
+      return file_name;
+    }
+
+    i += 2 + buffer[i + 1];
+  }
+
+  return NULL;
+}
+
+mode_t get_file_permissions(unsigned char *buffer, int buffer_len){
+  int i = 1;
+  while (i < buffer_len) {
+    if (buffer[i] == FILE_PERMISSIONS){
+      return *((mode_t *)(buffer + i + 2));
+    }
+
+    i += 2 + buffer[i + 1];
+  }
+
+  return -1;
 }

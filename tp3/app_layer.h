@@ -1,8 +1,9 @@
 #ifndef APP_LAYER_H
 #define APP_LAYER_H
 
-#define FILE_SIZE 0x00
+#define FILE_SIZE 0
 #define FILE_NAME 1
+#define FILE_PERMISSIONS 2
 
 #define DATA_C2 1
 #define START_C2 2
@@ -21,5 +22,9 @@ int connection(const char *port, int status);
 int send_file(char* filename);
 
 int receive_file();
+
+off_t get_file_size(unsigned char *buffer, int buffer_len);
+char *get_file_name(unsigned char *buffer, int buffer_len);
+mode_t get_file_permissions(unsigned char *buffer, int buffer_len);
 
 #endif

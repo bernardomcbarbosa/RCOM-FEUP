@@ -215,40 +215,6 @@ int llread(int fd, unsigned char *data_packet, unsigned int *data_packet_length)
   free(data_packet_destuffed);
   return 0;
 }
-/*
-      if(!(expected_bcc2 == get_bcc2(data_packet_destuffed, data_packet_destuffed_length-1))){
-        //invalid bcc
-        if(frame_rsp[2] != (c<<6)){
-          printf("Found duplicate frame. Discarding...\n");
-          frame = create_US_frame(&frame_length, RR);
-        }
-        else{
-          printf("Found new incorrect frame. Rejecting...\n");
-          frame = create_US_frame(&frame_length, REJ);
-        }
-      }
-      else{
-        //valid bcc
-        frame = create_US_frame(&frame_length, RR);
-        if(frame_rsp[2] != (c<<6)){
-          printf("Found duplicate frame with correct bcc2. Discarding...\n");
-        }
-        else{
-          //correct frame
-          c = !c;
-        }
-        read_succesful = !read_succesful;
-      }
-    }
-
-    if (write_frame(fd, frame, frame_length) == -1){
-      fprintf (stderr, "Error writing US frame!\n");
-      free(frame);
-      return -1;
-    }
-  }
-  */
-
 
 int llclose(int fd){
   unsigned char *frame, frame_rsp[255];
