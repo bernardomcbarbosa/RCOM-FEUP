@@ -46,6 +46,38 @@ retorno
 */
 int llopen(int port, int mode);
 
+/*
+int llwrite(int fd, char * buffer, int length)
+argumentos
+– fd: identificador da ligação de dados
+– buffer: array de caracteres a transmitir
+– length: comprimento do array de caracteres
+retorno
+– número de caracteres escritos
+– valor negativo em caso de erro
+*/
+int llwrite(int fd, unsigned char* data_packet, unsigned int data_packet_length);
+
+/*
+int llread(int fd, char * buffer)
+argumentos
+– fd: identificador da ligação de dados
+– buffer: array de caracteres recebidos
+retorno
+– número de caracteres escritos
+– valor negativo em caso de erro
+*/
+int llread(int fd, unsigned char *data_packet, unsigned int *data_packet_length);
+
+/*
+int llclose(int fd)
+argumentos
+– fd: identificador da ligação de dados
+retorno
+– valor positivo em caso de sucesso
+– valor negativo em caso de erro
+*/
+int llclose(int fd);
 
 int is_frame_SET(unsigned char* frame);
 int is_frame_UA(unsigned char* frame);
@@ -57,23 +89,12 @@ int write_frame(int fd, unsigned char *frame, unsigned int frame_length);
 int read_frame (int fd, unsigned char* frame, unsigned int *frame_length);
 
 unsigned char *create_US_frame(unsigned int *frame_length, int control_byte);
+unsigned char *create_I_frame(unsigned int *frame_length, unsigned char *data_packet, unsigned int data_packet_length);
 
-int write_buffer(int fd, unsigned char *buffer, int buffer_size);
-void read_buffer(int fd, unsigned char* buffer, int *buffer_length);
+unsigned char* read_byte_destuffing(unsigned char* buff, unsigned int *buff_length);
+unsigned char* write_byte_stuffing(unsigned char* buff, unsigned int *buff_length);
 
-int send_US_frame(int fd,int control);
-
-int llclose(int fd);
-
-unsigned char* read_byte_destuffing(unsigned char* buff, int *buff_length);
-unsigned char* write_byte_stuffing(unsigned char* buff, int *buff_length);
-
-unsigned char get_bcc2(unsigned char *pack,int pack_len);
-
-int send_I(int fd,unsigned char *buffer, int length);
-
-int llwrite(int fd, unsigned char* buffer, int length);
-int llread(int fd,unsigned char* buffer, int *buffer_len);
+unsigned char get_bcc2(unsigned char *pack, unsigned int pack_len);
 
 int setTerminalAttributes(int fd);
 

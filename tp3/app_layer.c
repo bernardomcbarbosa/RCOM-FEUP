@@ -35,11 +35,12 @@ int connection(const char *port, int mode){
 }
 
 int send_file(char* filename){
-  int fi, i, st_packet_length, read_bytes=0, send_bytes=0, sequenceN=0, send_buff_len, filesize;
+  int fi, i, read_bytes=0, send_bytes=0, sequenceN=0, send_buff_len, filesize;
   struct stat st;
   unsigned char fileSize[4];
   unsigned char file[252];
   unsigned char* send_buff;
+  unsigned int st_packet_length;
 
   if ((fi = open(filename,O_RDONLY)) == -1){
     fprintf(stderr, "Can't open %s\n", filename);
@@ -101,19 +102,22 @@ int send_file(char* filename){
 
 int receive_file(){
   unsigned char buffer[256],filename[50],read_bytes=0,sequenceN=0;
-  int buffer_len,res,filesize=0,i,fi;
+  int res,filesize=0,fi;
+  unsigned buffer_len;
 
   //START PACKET
+  printf ("1 - receive_file\n");
   res = llread(serial.fileDescriptor,buffer,&buffer_len);
+  printf ("2 - receive_file\n");
   while (res != 0 || buffer[0] != START_C2){
     res = llread(serial.fileDescriptor,buffer,&buffer_len);
   }
   //filesize
-  for (i = 3; i < 7; i++) {
+  for (unsigned int i = 3; i < 7; i++) {
         filesize += (int) (buffer[i]<<(8*(i-3)));
   }
   //filename
-  for (i = 9; i < buffer_len; i++) {
+  for (unsigned int i = 9; i < buffer_len; i++) {
     filename[i-9] = buffer[i];
   }
   filename[(int) buffer[8]] = '\0';

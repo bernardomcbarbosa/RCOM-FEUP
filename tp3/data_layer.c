@@ -107,123 +107,186 @@ int llopen(int port, int mode){
   }
 }
 
-int llwrite(int fd, unsigned char* buffer, int length){
-    unsigned char buff[5];
-    int buff_len,ok=1;
-    while(ok){ //timeout connections
-      send_I(fd,buffer,length);
-      read_buffer(fd,buff,&buff_len);
-      if(is_frame_RR(buff)){
-        c = !c;
-        ok = 0;
-      }
-      // else if(is_US_REJ){
-      //
-      // }
+int llwrite(int fd, unsigned char* data_packet, unsigned int data_packet_length){
+  unsigned int frame_length, frame_rsp_length;
+  unsigned char *frame, frame_rsp[255];
+  frame = create_I_frame(&frame_length, data_packet, data_packet_length);
+
+  while(attempts < data_layer.numTransmissions){
+    if(write_frame(fd, frame, frame_length) == -1){
+      fprintf (stderr, "Error writing US frame!\n");
+      free(frame);
+      return -1;
     }
 
-      return 0;
+    alarm(data_layer.timeout);
+
+    if(read_frame(fd, frame_rsp, &frame_rsp_length)==0){
+      attempts = 0;
+      alarm(0);
+      if(is_frame_RR(frame_rsp)){
+        c = !c;
+        free(frame);
+        return 0; //num caracteres escritos
+      }
+      //If we get a REJ frame it will just resend the I frame
+
+    }
+
+    alarm(0);
+    if(attempts>0 && attempts>data_layer.numTransmissions){
+      printf("Connection failed. Retrying %d out of %d...\n",
+      attempts, data_layer.numTransmissions);
+    }
   }
 
-int llread(int fd,unsigned char* buffer, int *buffer_len){
-  unsigned char buff[512],bcc2;
-  unsigned char* buffer_destuffed;
-  static int c = 0;
-  int buff_len;
-  int finish=0;
+  free(frame);
+  return -1;
+}
 
+int llread(int fd, unsigned char *data_packet, unsigned int *data_packet_length){
+  unsigned char frame_rsp[512], bcc2;
+  unsigned char* data_packet_destuffed, *frame;
+  unsigned int frame_rsp_length, frame_length, data_packet_destuffed_length;
+  int finish=0;
+  static int c = 0;
 
   while(!finish){
-  //read buffer from tty
-  read_buffer(fd,buff,&buff_len);
+    read_frame(fd, frame_rsp, &frame_rsp_length);
 
-  //check header
-   if (is_frame_DISC(buff))
-    llclose(fd);
+    if (is_frame_DISC(frame_rsp)){
+      llclose(fd);
+    }
 
-   if(!(buff[0] == FLAG && buff[1] == SEND_A && buff[3] == (buff[1] ^ buff[2]))){
-     return -1;
-   }
-   else{
-     buff_len -= 5; // 5 == FLAG + A + C1 + BCC1 + FLAG
-   }
+    //verify I header
+    if(!(frame_rsp[0] == FLAG && frame_rsp[1] == SEND_A && frame_rsp[3] == (frame_rsp[1] ^ frame_rsp[2]))){
+      return -1;
+    }
+    else{
+      frame_rsp_length -= I_FRAME_HEADER_SIZE;
+    }
 
-   memcpy(buffer,buff+4,buff_len);
+    memcpy(data_packet, frame_rsp+4, frame_rsp_length);
 
-   //destuff buffer
-   buffer_destuffed = read_byte_destuffing(buffer,&buff_len);
+    data_packet_destuffed_length = frame_rsp_length;
+    data_packet_destuffed = read_byte_destuffing(data_packet, &data_packet_destuffed_length);
+    //check bbc2 of destuffed data packet
+    bcc2 = data_packet_destuffed[data_packet_destuffed_length-1];
 
-   //check bbc2 of buffer
-   bcc2 = buffer_destuffed[buff_len-1];
+    if(!(bcc2 == get_bcc2(data_packet_destuffed, data_packet_destuffed_length-1))) {
+      if(frame_rsp[2] != (c<<6)){
+        printf("Found duplicate frame. Discarding...\n");
+        frame = create_US_frame(&frame_length, RR);
+        if (write_frame(fd, frame, frame_length) == -1){
+          fprintf (stderr, "Error writing US frame!\n");
+          free(frame);
+          return -1;
+        }
+        free(frame);
+        return -1;
+      }
+      else{
+        printf("Found new incorrect frame. Rejecting...\n");
+        frame = create_US_frame(&frame_length, REJ);
+        if (write_frame(fd, frame, frame_length) == -1){
+          fprintf (stderr, "Error writing US frame!\n");
+          free(frame);
+          return -1;
+        }
+        free(frame);
+      }
 
-   if(!( bcc2 == get_bcc2(buffer_destuffed,buff_len-1) )) {
+    }
+    else{
+      if(frame_rsp[2] != (c<<6)){
+        printf("Found duplicate frame with correct bcc2. Discarding...\n");
+        return -1;
+      }
+      else{
+        //correct frame
+        frame = create_US_frame(&frame_length, RR);
+        if (write_frame(fd, frame, frame_length) == -1){
+          fprintf (stderr, "Error writing US frame!\n");
+          free(frame);
+          return -1;
+        }
+        free(frame);
+        c = !c;
+      }
+      finish = !finish;
+    }
+  }
 
-     if(buff[2] != (c<<6)){
-       //duplicate frame
-       //send RR
-       //ask again
-       printf("frame duplicado\n");
-       send_US_frame(fd,RR);
-       return -1;
-     }
-     else{
-       printf("bcc2 errado\n");
-       send_US_frame(fd,REJ);
-       //REJ
-     }
-
-   }
-   else{
-
-     if(buff[2] != (c<<6)){
-       //duplicate frame
-       printf("frame duplicado e bcc2 certo\n");
-       return -1;
-     }
-     else{
-       //correct frame
-       //printf("frame correto\n");
-       send_US_frame(fd,RR);
-       c = !c;
-     }
-     finish = !finish;
-   }
- }
-
-  *buffer_len = buff_len-1;
-  memcpy(buffer,buffer_destuffed,buff_len-1);
-  free(buffer_destuffed);
+  *data_packet_length = data_packet_destuffed_length-1;
+  memcpy(data_packet, data_packet_destuffed, data_packet_destuffed_length-1);
+  free(data_packet_destuffed);
   return 0;
 }
 
 int llclose(int fd){
-  int buff_len;
-  unsigned char buff[5];
+  unsigned char *frame, frame_rsp[255];
+  unsigned int frame_length, frame_rsp_length;
+  attempts = 0;
 
-  //RECEIVER
-  if(data_layer.mode){
-    read_buffer(fd, buff, &buff_len);
-    if(!is_frame_DISC(buff))
+  if(data_layer.mode == RECEIVER){
+    do{
+      read_frame(fd, frame_rsp, &frame_rsp_length);
+    }while (!is_frame_DISC(frame_rsp));
+
+    printf("DISC received\n");
+
+    frame = create_US_frame(&frame_length, DISC);
+    if (write_frame(fd, frame, frame_length) == -1){
+      fprintf (stderr, "Error writing US frame!\n");
+      free(frame);
       return -1;
-    else
-        printf("DISC received");
+    }
+    free(frame);
+    return 1;
+  }
+  else if(data_layer.mode == TRANSMITTER){
+    frame = create_US_frame(&frame_length, DISC);
+    while (attempts < data_layer.numTransmissions){
+      if (write_frame(fd, frame, frame_length) == -1){
+        fprintf (stderr, "Error writing US frame!\n");
+        free(frame);
+        return -1;
+      }
 
-    send_US_frame(fd,DISC);
+      alarm(data_layer.timeout);
+
+      if(read_frame(fd, frame_rsp, &frame_rsp_length)==0){
+        attempts = 0;
+        alarm(0);
+        if(is_frame_DISC(frame_rsp)){
+          printf("DISC received\n");
+          //Received DISC so we send UA
+          frame = create_US_frame(&frame_length, UA);
+          if (write_frame(fd, frame, frame_length) == -1){
+            fprintf (stderr, "Error writing US frame!\n");
+            free(frame);
+            return -1;
+          }
+          close(fd);
+          return 1;
+        }
+      }
+
+      alarm(0);
+      if(attempts>0 && attempts>data_layer.numTransmissions){
+        printf("Connection failed. Retrying %d out of %d...\n",
+        attempts, data_layer.numTransmissions);
+      }
+    }
+
+    free(frame);
+    return -1;
   }
   else{
-    send_US_frame(fd,DISC);
-
-    read_buffer(fd, buff, &buff_len);
-    if(!is_frame_DISC(buff))
-      return -1;
-    else
-      printf("DISC received");
-
-    send_US_frame(fd,UA);
+    fprintf(stderr, "Invalid mode\n");
+    exit(1);
   }
 
-  close(fd);
-  return 0;
 }
 
 int is_frame_SET(unsigned char* frame){
@@ -350,103 +413,38 @@ unsigned char *create_US_frame(unsigned int *frame_length, int control_byte){
   return US_frame;
 }
 
+unsigned char *create_I_frame(unsigned int *frame_length, unsigned char *data_packet, unsigned int data_packet_length){
+  unsigned char bcc2;
+  unsigned int bcc_length;
+  unsigned char *stuffed_bcc, *stuffed_data_packet;
+  unsigned char *frame;
+  static int c=1;
+  c = !c;
 
+  bcc2 = get_bcc2(data_packet, data_packet_length);
+  bcc_length = 1;
+  stuffed_bcc = write_byte_stuffing (&bcc2, &bcc_length);
+  stuffed_data_packet = write_byte_stuffing (data_packet, &data_packet_length);
 
-/* Make sure all of the buffer is sent*/
-int write_buffer(int fd, unsigned char *buffer, int buffer_size){
-  int bytes_sent, bytes_sent_total = 0;
+  (*frame_length) = 5 + data_packet_length + bcc_length;
+  frame = malloc (*frame_length * sizeof(char));
 
-  while (bytes_sent_total < buffer_size){
-    bytes_sent = write(fd, buffer, buffer_size);
+  frame[0] = FLAG;
+  frame[1] = SEND_A;
+  frame[2] = c<<6;
+  frame[3] = frame[1]^frame[2];
 
-    if (bytes_sent <= 0){
-      return -1;
-    }
-    bytes_sent_total += bytes_sent;
-  }
-  return bytes_sent_total;
+  memcpy (frame + 4, stuffed_data_packet, data_packet_length);
+  memcpy (frame + data_packet_length + 4, stuffed_bcc, bcc_length);
+
+  frame[*frame_length-1] = FLAG;
+  free(stuffed_data_packet);
+  free(stuffed_bcc);
+
+  return frame;
 }
 
-
-void read_buffer(int fd, unsigned char* buffer, int *buffer_length){
-  int i=0,res;
-
-  //S1
-  do{
-    res = read(fd,buffer,1);
-  }while (res==0);
-  i++;
-
-  //S2
-  while ((res!=0) && (buffer[0] == FLAG)) {
-    res = read(fd,buffer+i,1);
-    if(buffer[i] != FLAG)
-      break;
-  }
-  i++;
-
-  //S3
-  while ((res!=0)) {
-    res = read(fd,buffer+i,1);
-    if(buffer[i] == FLAG)
-      break;
-    i++;
-  }
-  i++;
-  *buffer_length = i;
-}
-
-int send_US_frame(int fd,int control) {
-  unsigned char* US_msg;
-  static int c = 0;
-
-  US_msg = (unsigned char *) malloc( sizeof(char)*US_FRAME_LENGTH);
-
-  US_msg[0] = FLAG;
-
-  if(data_layer.mode){
-    //RECEIVER
-    if(control == UA || control == REJ || control == RR || control == DISC)
-      US_msg[1] = SEND_A;
-    else
-      US_msg[1] = RECEIVE_A;
-  }
-  else{
-    //TRANSMITTER
-    if(control == SET || control == DISC)
-      US_msg[1] = SEND_A;
-    else
-      US_msg[1] = RECEIVE_A;
-  }
-
-  if (control == REJ || control == RR) {
-    US_msg[2] = c << 7 | control;
-    c = !c;
-  } else
-    US_msg[2] = control;
-
-  US_msg[3] = US_msg[1] ^ US_msg[2];
-  US_msg[4] = FLAG;
-
-  // while (attempts <= data_layer.numTransmissions + 1) {
-  if (write_buffer(fd, US_msg, US_FRAME_LENGTH) == -1) {
-    printf("Error writing US frame!\n");
-    return -1;
-  }
-
-  free(US_msg);
-
-  // alarm(data_layer.timeout);
-  //
-  // alarm(0);
-  // if (attempts > 0 && attempts < data_layer.numTransmissions)
-  //   printf("Connection failed! Retrying %d out of %d...\n",attempts, data_layer.numTransmissions);
-  // }asd
-
-  return 0;
-}
-
-unsigned char* read_byte_destuffing(unsigned char* buff, int *buff_length){
+unsigned char* read_byte_destuffing(unsigned char* buff, unsigned int *buff_length){
   int i,destuff=0,buff_destuffed_len;
   unsigned char* buff_destuffed;
 
@@ -475,7 +473,7 @@ unsigned char* read_byte_destuffing(unsigned char* buff, int *buff_length){
   return buff_destuffed;
 }
 
-unsigned char* write_byte_stuffing(unsigned char* buff, int *buff_length){
+unsigned char* write_byte_stuffing(unsigned char* buff, unsigned int *buff_length){
   int i,stuff=0,buff_stuffed_len;
   unsigned char *buff_stuffed;
 
@@ -500,42 +498,12 @@ unsigned char* write_byte_stuffing(unsigned char* buff, int *buff_length){
   return buff_stuffed;
 }
 
-unsigned char get_bcc2(unsigned char *pack,int pack_len){
+unsigned char get_bcc2(unsigned char *pack, unsigned int pack_len){
   int i=0;
   char c = pack[i];
   for(i=1;i<pack_len;i++)
     c ^= pack[i];
   return c;
-}
-
-int send_I(int fd,unsigned char *buffer, int length){
-  unsigned char bcc2;
-  unsigned char *buffer_stuffed;
-  int buf_len,final_len;
-  static int c=1;
-  c = !c;
-
-  //get bbc2
-  bcc2 = get_bcc2(buffer,length);
-  buf_len = length+1;
-  buffer = (unsigned char *)realloc(buffer,buf_len);
-  buffer[buf_len-1] = bcc2;
-
-  //stuff buffer
-  buffer_stuffed = write_byte_stuffing(buffer,&buf_len);
-
-  //header
-  final_len = 4 + buf_len + 1;
-  unsigned char* final_buff = (unsigned char *)malloc(final_len);
-  final_buff[0] = FLAG;
-  final_buff[1] = SEND_A;
-  final_buff[2] = c << 6;
-  final_buff[3] = final_buff[1] ^ final_buff[2];
-  memcpy(final_buff + 4, buffer_stuffed, buf_len);
-  free(buffer_stuffed);
-  final_buff[final_len-1] = FLAG;
-
-  return write_buffer(fd,final_buff,final_len);
 }
 
 int setTerminalAttributes(int fd) {
