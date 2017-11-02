@@ -1,0 +1,114 @@
+Protocolos de Aplicação IETF
+
+- Qual a aplicação Unix que implementa o protocolo TELNET? Consulte as páginas do manual (man) sobre esta aplicação.
+
+- Verifique no seu sistema Unix quais são os ports em que respondem os servidores de TELNET, SMTP, POP3 e FTP.
+
+- Usando a aplicação que implementa o protocolo TELNET, contacte o port do serviço smtp do sistema smtp.fe.up.pt. Que resposta obteve?
+
+- Abra uma ligação ao servidor de SMTP e envie um mail.
+  ">", linha de comando a introduzir pelo aluno, que se comporta como um cliente de SMTP (alterar os endereços de mail conforme apropriado).
+  "<", resposta do servidor (ou semelhante).
+Os caracteres ">" / "<" não são enviados/recebidos.
+
+> telnet smtp.fe.up.pt 25
+< 220 smtp.fe.up.pt ESMTP Sendmail 8.10.1/8.10.1; Thu, 22 Nov 2001 20:21:14 GMT
+> helo fe.up.pt
+< 250 smtp.fe.up.pt Hello quarteira.fe.up.pt
+[192.168.103.126], pleased to meet you
+> mail from: josedasilva@fe.up.pt
+< 250 2.1.0 josedasilva @fe.up.pt... Sender ok
+> rcpt to: euproprio@fe.up.pt
+< 250 2.1.5 euproprio@fe.up.pt... Recipient ok
+> data
+< 354 Enter mail, end with "." on a line by itself
+> ola.
+> .
+< 250 2.0.0 fAMKLfE18191 Message accepted for delivery
+> quit
+< 221 2.0.0 lorosae.fe.up.pt closing connection
+
+- Usando o seu cliente de mail, verifique se o mail foi armazenado na sua mailbox.
+
+- Abra uma ligação TCP ao servidor de POP3 do sistema maila.fe.up.pt. Verifique quantas mensagens tem e importe-as.
+
+> telnet maila.fe.up.pt 110
+< +OK PO3 maila.fe.up.pt v2003.83rh server ready
+> user euproprio
+< +OK Password required for euproprio.
+> pass _cuidado_que_fica_visível_
+< +OK euproprio has 2 visible messages (0 hidden) in 17498 octets.
+> stat
+< +OK 2 17498
+> retr 1
+< +OK 889 octets
+< ...
+< .
+> retr 2
+< ...
+< .
+> quit
+
+- Experiência de FTP
+O FTP usa uma ligação TCP para controlo e, para cada ficheiro a transferir, abre uma nova ligação TCP. Serão necessárias duas janelas (janela_A e janela_B) para efectuar esta experiência.
+
+Na janela_A, fazemos
+> telnet tom.fe.up.pt 21
+> user euproprio
+< 331 Password required for euproprio.
+> pass _cuidado_que_fica_visivel_
+< 230 User euproprio logged in.
+> pasv
+< 227 Entering Passive Mode (193,136,28,12,19,91)
+
+Com o comando "pasv", pede-se ao servidor de FTP para transferir dados em modo passivo. Nesta situação, o cliente ficara responsável pela abertura da ligação TCP para os dados.
+
+Na resposta, o servidor envia 6 bytes (exemplo: 193,136,28,12,19,91) com o seguinte significado:
+- 193,136,28,12 endereço IP do servidor,
+- 19,91 porta em que o servidor se encontra à espera de ligação.
+A interpretação destes dois bytes deverá ser feita daseguinte forma:
+porta = 19*256 + 91 = 4955
+
+Na janela_B, faça então
+> telnet tom.fe.up.pt 4955
+< ...
+
+Na janela_A, de novo
+> retr ficheiro
+
+E observe o ficheiro recebido na janela_B. Cada janela funciona como a extremidade de uma ligação.
+
+
+- Ligue-se ao servidor de www da FEUP. Nos comandos que se seguem, não se esqueça de incluir uma linha em branco a seguir ao comando "HOST: www.fe.up.pt" (2 "returns").
+
+> telnet www.fe.up.pt 80
+> GET / HTTP/1.1
+> HOST: www.fe.up.pt
+>
+< HTTP/1.1 200 OK
+< Date: Thu, 22 Nov 2001 20:38:37 GMT
+< Server: Apache/1.3.20 (Unix) mod_ssl/2.8.4 OpenSSL/0.9.6b
+< Last-Modified: Thu, 05 Jul 2001 13:55:20 GMT
+< ETag: "45e5-2d8-3b4471c8"
+< Accept-Ranges: bytes
+< Content-Length: 728
+< Content-Type: text/html
+<
+< < html>
+< ...
+< function changeLocation(){
+< location
+'http://sifeup.fe.up.pt/sifeup/web_page.inicial';
+< }
+< ...
+<
+< < /html>
+
+Como se pode observar, esta página pede ao cliente para estabelecer nova
+ligação com o sistema sifeup.fe.up.pt ...
+
+> telnet sifeup.fe.up.pt 80
+> GET /sifeup/web_page.inicial HTTP/1.1
+> HOST: sifeup.fe.up.pt
+>
+....
