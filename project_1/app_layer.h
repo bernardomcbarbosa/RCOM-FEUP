@@ -13,11 +13,11 @@
 #define n(x) (x%256)
 
 typedef struct applicationLayer{
-       int fileDescriptor; /*Descritor correspondente à porta série*/
-       int mode;  /*TRANSMITTER | RECEIVER*/
+       int fileDescriptor; //Serial port file descriptor
+       int mode;  //TRANSMITTER 0 / RECEIVER 1
 } applicationLayer;
 
-int connection(const char *port, int status);
+int connection(const char *port, int mode);
 
 int send_file(char* filename);
 

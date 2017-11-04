@@ -26,13 +26,13 @@
 #define BAUDRATE B38400
 
 typedef struct linkLayer {
-  int fd;
-  char port[20];
+  int fd; //Serial port file descriptor
+  char port[20]; //Serial port device
   int mode; //TRANSMITTER 0 / RECEIVER 1
   struct sigaction new_action; //timer "start"
   struct sigaction old_action; //timer "stopped"
-  unsigned int timeout; //temporizador
-  unsigned int numTransmissions; //Nº tentativas caso falhe
+  unsigned int timeout; //Time to timeout
+  unsigned int numTransmissions; //Maximum number of retries
 } linkLayer;
 
 /*

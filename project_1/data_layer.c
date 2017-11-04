@@ -133,7 +133,7 @@ int llwrite(int fd, unsigned char* data_packet, unsigned int data_packet_length)
       if(is_frame_RR(frame_rsp)){
         c = !c;
         free(frame);
-        return 0; //num caracteres escritos
+        return frame_length;
       }
       //If we get a REJ frame it will just resend the I frame
     }

@@ -64,7 +64,10 @@ int send_file(char* filename){
   start_packet[6 + sizeof(mode_t) + sizeof(st.st_size)] = strlen(filename);
   strcat((char*) start_packet + 7 + sizeof(mode_t) + sizeof(st.st_size), filename);
 
-  llwrite(serial.fileDescriptor, start_packet, st_packet_length);
+  if (llwrite(serial.fileDescriptor, start_packet, st_packet_length) < 0){
+    fprintf(stderr, "Error llwrite ()\n");
+    exit(-1);
+  }
 
   printf ("Sending data . . .\n");
 
@@ -84,7 +87,11 @@ int send_file(char* filename){
     memcpy(send_buff+4, file, read_bytes); //data packet
 
     send_buff_len = read_bytes + 4;
-    llwrite(serial.fileDescriptor, send_buff, send_buff_len);
+    if (llwrite(serial.fileDescriptor, send_buff, send_buff_len) < 0){
+      fprintf(stderr, "Error llwrite ()\n");
+      exit(-1);
+    }
+
 
     send_bytes += read_bytes;
     sequenceN++;
@@ -93,8 +100,11 @@ int send_file(char* filename){
   close(fi);
   //END PACKET
   start_packet[0] = END_C2;
-  llwrite(serial.fileDescriptor, start_packet, st_packet_length);
 
+  if (llwrite(serial.fileDescriptor, start_packet, st_packet_length) < 0){
+    fprintf(stderr, "Error llwrite ()\n");
+    exit(-1);
+  }
   if(llclose(serial.fileDescriptor) < 0){
     fprintf(stderr, "Error llclose()");
     return -1;
