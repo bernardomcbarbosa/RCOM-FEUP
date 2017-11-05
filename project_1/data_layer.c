@@ -16,10 +16,10 @@ linkLayer data_layer;
 static int c=0; //llwrite / RR / REJ
 struct termios oldtio;
 unsigned int attempts = 0;
+unsigned int Tprop = 1, flag = 1;
 
 int llopen(int port, int mode){
   int fd;
-  //struct termios newtio;
   unsigned char *frame, frame_rsp[255];
   unsigned int frame_length, frame_rsp_length;
   attempts = 0;
@@ -118,29 +118,22 @@ int llwrite(int fd, unsigned char* data_packet, unsigned int data_packet_length)
 
   frame = create_I_frame(&frame_length, data_packet, data_packet_length);
   while(attempts < data_layer.numTransmissions){
-    printf("Trying to send I FRAME : ");
     if(write_frame(fd, frame, frame_length) == -1){
       fprintf (stderr, "Error writing US frame!\n");
       resetSettings(fd);
       free(frame);
       return -1;
     }
-    printf("Sent\n");
+
     alarm(data_layer.timeout);
 
     if(read_frame(fd, frame_rsp, &frame_rsp_length)==0){
-      printf("frame_rsp_length: %u", frame_rsp_length);
       attempts = 0;
       alarm(0);
       if(is_frame_RR(frame_rsp)){
-        printf("GOT RR\n");
         c = !c;
         free(frame);
         return frame_length;
-        //return 0;
-      }
-      else if(is_frame_REJ(frame_rsp)){
-        printf("GOT REJ\n");
       }
       //If we get a REJ frame it will just resend the I frame
     }
@@ -164,16 +157,30 @@ int llread(int fd, unsigned char *data_packet, unsigned int *data_packet_length)
   int read_succesful=0, sig=0;
   static int c = 0;
 
+
+  unsigned int header_error = randomError(HEADER_ERROR_PROB);
+  unsigned int body_error = randomError(BODY_ERROR_PROB);
+
   while(!read_succesful){
-    printf("Trying to read I FRAME : ");
     read_frame(fd, frame_rsp, &frame_rsp_length);
-    printf("Read\n");
+
+
+    //Tprop
+    if (TPROP != 0){
+      while(Tprop){
+        if(flag){
+          alarm(TPROP);
+          flag=0;
+        }
+      }
+      Tprop=1;
+    }
 
     if (is_frame_DISC(frame_rsp)){
       llclose(fd);
     }
 
-    if(!is_I_frame_header_valid(frame_rsp, frame_rsp_length) || randomError(10)){
+    if(!is_I_frame_header_valid(frame_rsp, frame_rsp_length) || header_error){
       printf("Invalid frame header. Rejecting frame..\n");
       frame = create_US_frame(&frame_length, REJ);
       sig = 1;
@@ -189,7 +196,8 @@ int llread(int fd, unsigned char *data_packet, unsigned int *data_packet_length)
       //check bbc2 of destuffed data packet
       expected_bcc2 = data_packet_destuffed[data_packet_destuffed_length-1];
 
-      if((expected_bcc2 == get_bcc2(data_packet_destuffed, data_packet_destuffed_length-1)) /*&& !randomError(10)*/){
+
+      if((expected_bcc2 == get_bcc2(data_packet_destuffed, data_packet_destuffed_length-1)) && !body_error){
         //Valid bcc2 - might still be a duplicate frame
         frame = create_US_frame(&frame_length, RR);
 
@@ -205,7 +213,7 @@ int llread(int fd, unsigned char *data_packet, unsigned int *data_packet_length)
       }
       else{
         //Invalid bcc2
-        if(is_I_frame_sequence_number_valid(frame_rsp[2], c)){
+        if(is_I_frame_sequence_number_valid(frame_rsp[2], c) || body_error){
           frame = create_US_frame(&frame_length, REJ);
           printf("Found new incorrect frame. Rejecting...\n");
         }
@@ -217,16 +225,6 @@ int llread(int fd, unsigned char *data_packet, unsigned int *data_packet_length)
         read_succesful = 1;
       }
     }
-    printf ("Writing Answer: ");
-
-    if (is_frame_REJ(frame)){
-      printf("REJ");
-    }
-
-    if (is_frame_RR(frame)){
-      printf("RR");
-    }
-
 
     if (write_frame(fd, frame, frame_length) == -1){
       fprintf (stderr, "Error writing US frame!\n");
@@ -234,7 +232,6 @@ int llread(int fd, unsigned char *data_packet, unsigned int *data_packet_length)
       free(frame);
       return -1;
     }
-    printf ("Sent\n");
   }
   free(frame);
 
@@ -346,14 +343,14 @@ int is_frame_DISC(unsigned char* frame){
 }
 
 int is_frame_RR(unsigned char* frame){
-  if(frame[0] == FLAG && frame[1] == SEND_A && frame[2]== (c << 7 | RR) && ((frame[1] ^ frame[2]) == frame[3]) && frame[4] == FLAG)
+  if(frame[0] == FLAG && frame[1] == SEND_A && (frame[2]== (c << 7 | RR) || frame[2]== (!c << 7 | RR)) && ((frame[1] ^ frame[2]) == frame[3]) && frame[4] == FLAG)
     return 1;
   else
     return 0;
 }
 
 int is_frame_REJ(unsigned char* frame){
-  if(frame[0] == FLAG && frame[1] == SEND_A && frame[2]== (c << 7 | REJ) && ((frame[1] ^ frame[2]) == frame[3]) && frame[4] == FLAG)
+  if(frame[0] == FLAG && frame[1] == SEND_A && (frame[2]== (c << 7 | REJ) || frame[2]== (!c << 7 | REJ)) && ((frame[1] ^ frame[2]) == frame[3]) && frame[4] == FLAG)
     return 1;
   else
     return 0;
@@ -613,35 +610,15 @@ void setTimeOutSettings(unsigned int timeout, unsigned int retries){
 
 void timeout_handler(int signum){
   attempts++;
+  flag=1;
+  Tprop=0;
 }
 
 unsigned int randomError(int prob){
-  int randomN = rand()%101;
-  printf("%d", randomN);
-
-  if (randomN<= prob){
+  int randomN = rand()%100;
+  //printf("randomN: %d\n", randomN);
+  if (randomN<prob){
     return TRUE;
   }
   return FALSE;
 }
-
-/*
-int randint(int n) {
-  if ((n - 1) == RAND_MAX) {
-    return rand();
-  } else {
-    // Chop off all of the values that would cause skew...
-    long end = RAND_MAX / n; // truncate skew
-    assert (end > 0L);
-    end *= n;
-
-    // ... and ignore results from rand() that fall above that limit.
-    // (Worst case the loop condition should succeed 50% of the time,
-    // so we can expect to bail out of this loop pretty quickly.)
-    int r;
-    while ((r = rand()) >= end);
-
-    return r % n;
-  }
-}
-*/

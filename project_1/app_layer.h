@@ -9,6 +9,9 @@
 #define START_C2 2
 #define END_C2 3
 
+#define MILLISECONDS_PER_SECOND 1000
+#define NANOSECONDS_PER_MILLISECOND 1000000
+
 #define k(l1,l2) (256*l2+l1)
 #define n(x) (x%256)
 

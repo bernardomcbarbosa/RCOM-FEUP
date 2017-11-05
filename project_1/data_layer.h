@@ -25,8 +25,12 @@
 
 #define BAUDRATE B38400
 
+#define HEADER_ERROR_PROB 30
+#define BODY_ERROR_PROB 30
 #define TRUE 1
 #define FALSE 0
+
+#define TPROP 1
 
 typedef struct linkLayer {
   int fd; //Serial port file descriptor
@@ -108,11 +112,5 @@ void setTimeOutSettings(unsigned int timeout, unsigned int retries);
 void timeout_handler(int signum);
 
 unsigned int randomError(int prob);
-
-/* Returns an integer in the range [0, n).
- *
- * Uses rand(), and so is affected-by/affects the same seed.
- */
-//int randint(int n);
 
 #endif

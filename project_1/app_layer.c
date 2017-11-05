@@ -7,6 +7,7 @@
 #include <fcntl.h>
 #include <stdint.h>
 #include <errno.h>
+#include <time.h>
 
 #include "data_layer.h"
 #include "app_layer.h"
@@ -40,6 +41,7 @@ int send_file(char* filename){
   unsigned char file[252];
   unsigned char* send_buff;
   unsigned int st_packet_length;
+  struct timespec t0, t1;
 
   if ((fi = open(filename,O_RDONLY)) == -1){
     fprintf(stderr, "Can't open %s\n", filename);
@@ -69,9 +71,10 @@ int send_file(char* filename){
     exit(-1);
   }
 
-  printf ("Sending data . . .\n");
-
   //DATA
+  printf ("Sending data . . .\n");
+  clock_gettime(CLOCK_MONOTONIC, &t0);
+
   filesize = (int) file_size;
   send_buff = (unsigned char *)malloc(256);
   while(send_bytes < filesize){
@@ -98,6 +101,13 @@ int send_file(char* filename){
     printf("Sent : %d ; Out of :%d\n",send_bytes,filesize);
   }
   close(fi);
+
+  clock_gettime(CLOCK_MONOTONIC, &t1);
+  double long elapsedTime=0;
+
+  elapsedTime = ((t1.tv_sec - t0.tv_sec)*MILLISECONDS_PER_SECOND)
+    + ((t1.tv_nsec - t0.tv_nsec )/NANOSECONDS_PER_MILLISECOND);
+
   //END PACKET
   start_packet[0] = END_C2;
 
@@ -105,6 +115,8 @@ int send_file(char* filename){
     fprintf(stderr, "Error llwrite ()\n");
     exit(-1);
   }
+
+  printf("%Lf - elapsedTime\n", elapsedTime);
   if(llclose(serial.fileDescriptor) < 0){
     fprintf(stderr, "Error llclose()");
     return -1;
