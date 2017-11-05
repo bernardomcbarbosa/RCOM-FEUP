@@ -8,6 +8,7 @@
 #include <sys/types.h>
 #include <termios.h>
 #include <unistd.h>
+#include <time.h>
 
 #include "app_layer.h"
 #include "data_layer.h"
@@ -44,6 +45,8 @@ int main(int argc, char** argv)
 		printf("TRANSMITTER(0) or RECEIVER(1): ");
 		scanf("%d", &mode);
 	}while (mode != 0 && mode != 1);
+
+	srand(time(NULL));
 
 	getParameters();
 	if (mode == RECEIVER){

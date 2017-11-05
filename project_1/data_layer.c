@@ -118,22 +118,29 @@ int llwrite(int fd, unsigned char* data_packet, unsigned int data_packet_length)
 
   frame = create_I_frame(&frame_length, data_packet, data_packet_length);
   while(attempts < data_layer.numTransmissions){
+    printf("Trying to send I FRAME : ");
     if(write_frame(fd, frame, frame_length) == -1){
       fprintf (stderr, "Error writing US frame!\n");
       resetSettings(fd);
       free(frame);
       return -1;
     }
-
+    printf("Sent\n");
     alarm(data_layer.timeout);
 
     if(read_frame(fd, frame_rsp, &frame_rsp_length)==0){
+      printf("frame_rsp_length: %u", frame_rsp_length);
       attempts = 0;
       alarm(0);
       if(is_frame_RR(frame_rsp)){
+        printf("GOT RR\n");
         c = !c;
         free(frame);
         return frame_length;
+        //return 0;
+      }
+      else if(is_frame_REJ(frame_rsp)){
+        printf("GOT REJ\n");
       }
       //If we get a REJ frame it will just resend the I frame
     }
@@ -152,19 +159,21 @@ int llwrite(int fd, unsigned char* data_packet, unsigned int data_packet_length)
 
 int llread(int fd, unsigned char *data_packet, unsigned int *data_packet_length){
   unsigned char frame_rsp[512], expected_bcc2;
-  unsigned char* data_packet_destuffed, *frame;
-  unsigned int frame_rsp_length, frame_length, data_packet_destuffed_length;
+  unsigned char *data_packet_destuffed, *frame;
+  unsigned int frame_rsp_length, frame_length, data_packet_destuffed_length=0;
   int read_succesful=0, sig=0;
   static int c = 0;
 
   while(!read_succesful){
+    printf("Trying to read I FRAME : ");
     read_frame(fd, frame_rsp, &frame_rsp_length);
+    printf("Read\n");
 
     if (is_frame_DISC(frame_rsp)){
       llclose(fd);
     }
 
-    if(!is_I_frame_header_valid(frame_rsp, frame_rsp_length)){
+    if(!is_I_frame_header_valid(frame_rsp, frame_rsp_length) || randomError(10)){
       printf("Invalid frame header. Rejecting frame..\n");
       frame = create_US_frame(&frame_length, REJ);
       sig = 1;
@@ -180,7 +189,7 @@ int llread(int fd, unsigned char *data_packet, unsigned int *data_packet_length)
       //check bbc2 of destuffed data packet
       expected_bcc2 = data_packet_destuffed[data_packet_destuffed_length-1];
 
-      if((expected_bcc2 == get_bcc2(data_packet_destuffed, data_packet_destuffed_length-1))){
+      if((expected_bcc2 == get_bcc2(data_packet_destuffed, data_packet_destuffed_length-1)) /*&& !randomError(10)*/){
         //Valid bcc2 - might still be a duplicate frame
         frame = create_US_frame(&frame_length, RR);
 
@@ -203,11 +212,21 @@ int llread(int fd, unsigned char *data_packet, unsigned int *data_packet_length)
         else{
           frame = create_US_frame(&frame_length, RR);
           printf("Found duplicate frame. Discarding...\n");
-          sig = 1;
-          read_succesful = 1;
         }
+        sig = 1;
+        read_succesful = 1;
       }
     }
+    printf ("Writing Answer: ");
+
+    if (is_frame_REJ(frame)){
+      printf("REJ");
+    }
+
+    if (is_frame_RR(frame)){
+      printf("RR");
+    }
+
 
     if (write_frame(fd, frame, frame_length) == -1){
       fprintf (stderr, "Error writing US frame!\n");
@@ -215,6 +234,7 @@ int llread(int fd, unsigned char *data_packet, unsigned int *data_packet_length)
       free(frame);
       return -1;
     }
+    printf ("Sent\n");
   }
   free(frame);
 
@@ -225,8 +245,10 @@ int llread(int fd, unsigned char *data_packet, unsigned int *data_packet_length)
   else{
     *data_packet_length = 0;
   }
+  if(data_packet_destuffed_length!=0){
+    free(data_packet_destuffed);
+  }
 
-  free(data_packet_destuffed);
   return 0;
 }
 
@@ -592,3 +614,34 @@ void setTimeOutSettings(unsigned int timeout, unsigned int retries){
 void timeout_handler(int signum){
   attempts++;
 }
+
+unsigned int randomError(int prob){
+  int randomN = rand()%101;
+  printf("%d", randomN);
+
+  if (randomN<= prob){
+    return TRUE;
+  }
+  return FALSE;
+}
+
+/*
+int randint(int n) {
+  if ((n - 1) == RAND_MAX) {
+    return rand();
+  } else {
+    // Chop off all of the values that would cause skew...
+    long end = RAND_MAX / n; // truncate skew
+    assert (end > 0L);
+    end *= n;
+
+    // ... and ignore results from rand() that fall above that limit.
+    // (Worst case the loop condition should succeed 50% of the time,
+    // so we can expect to bail out of this loop pretty quickly.)
+    int r;
+    while ((r = rand()) >= end);
+
+    return r % n;
+  }
+}
+*/
