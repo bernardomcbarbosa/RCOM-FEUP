@@ -153,7 +153,7 @@ int llwrite(int fd, unsigned char* data_packet, unsigned int data_packet_length)
 int llread(int fd, unsigned char *data_packet, unsigned int *data_packet_length){
   unsigned char frame_rsp[512], expected_bcc2;
   unsigned char* data_packet_destuffed, *frame;
-  unsigned int frame_rsp_length, frame_length, data_packet_destuffed_length;
+  unsigned int frame_rsp_length, frame_length, data_packet_destuffed_length=0;
   int read_succesful=0, sig=0;
   static int c = 0;
 
@@ -203,9 +203,9 @@ int llread(int fd, unsigned char *data_packet, unsigned int *data_packet_length)
         else{
           frame = create_US_frame(&frame_length, RR);
           printf("Found duplicate frame. Discarding...\n");
-          sig = 1;
-          read_succesful = 1;
         }
+        sig = 1;
+        read_succesful = 1;
       }
     }
 
@@ -226,7 +226,10 @@ int llread(int fd, unsigned char *data_packet, unsigned int *data_packet_length)
     *data_packet_length = 0;
   }
 
-  free(data_packet_destuffed);
+  if(data_packet_destuffed_length!=0){
+    free(data_packet_destuffed);
+  }
+
   return 0;
 }
 
@@ -324,14 +327,14 @@ int is_frame_DISC(unsigned char* frame){
 }
 
 int is_frame_RR(unsigned char* frame){
-  if(frame[0] == FLAG && frame[1] == SEND_A && frame[2]== (c << 7 | RR) && ((frame[1] ^ frame[2]) == frame[3]) && frame[4] == FLAG)
+  if(frame[0] == FLAG && frame[1] == SEND_A && (frame[2]== (c << 7 | RR) || frame[2]== (!c << 7 | RR)) && ((frame[1] ^ frame[2]) == frame[3]) && frame[4] == FLAG)
     return 1;
   else
     return 0;
 }
 
 int is_frame_REJ(unsigned char* frame){
-  if(frame[0] == FLAG && frame[1] == SEND_A && frame[2]== (c << 7 | REJ) && ((frame[1] ^ frame[2]) == frame[3]) && frame[4] == FLAG)
+  if(frame[0] == FLAG && frame[1] == SEND_A && (frame[2]== (c << 7 | REJ) || frame[2]== (!c << 7 | REJ)) && ((frame[1] ^ frame[2]) == frame[3]) && frame[4] == FLAG)
     return 1;
   else
     return 0;
