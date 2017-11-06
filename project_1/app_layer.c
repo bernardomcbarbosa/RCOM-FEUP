@@ -42,6 +42,7 @@ int send_file(char* filename){
   unsigned char* send_buff;
   unsigned int st_packet_length;
   struct timespec t0, t1;
+  static long int total_bits_sent=0;
 
   if ((fi = open(filename,O_RDONLY)) == -1){
     fprintf(stderr, "Can't open %s\n", filename);
@@ -90,11 +91,10 @@ int send_file(char* filename){
     memcpy(send_buff+4, file, read_bytes); //data packet
 
     send_buff_len = read_bytes + 4;
-    if (llwrite(serial.fileDescriptor, send_buff, send_buff_len) < 0){
+    if ((total_bits_sent=llwrite(serial.fileDescriptor, send_buff, send_buff_len)) < 0){
       fprintf(stderr, "Error llwrite ()\n");
       exit(-1);
     }
-
 
     send_bytes += read_bytes;
     sequenceN++;
@@ -108,6 +108,8 @@ int send_file(char* filename){
   elapsedTime = ((t1.tv_sec - t0.tv_sec)*MILLISECONDS_PER_SECOND)
     + ((t1.tv_nsec - t0.tv_nsec )/NANOSECONDS_PER_MILLISECOND);
 
+
+
   //END PACKET
   start_packet[0] = END_C2;
 
@@ -115,7 +117,7 @@ int send_file(char* filename){
     fprintf(stderr, "Error llwrite ()\n");
     exit(-1);
   }
-
+  printf("%li - total_bits_sent\n", total_bits_sent);
   printf("%Lf - elapsedTime\n", elapsedTime);
   if(llclose(serial.fileDescriptor) < 0){
     fprintf(stderr, "Error llclose()");

@@ -115,6 +115,7 @@ int llopen(int port, int mode){
 int llwrite(int fd, unsigned char* data_packet, unsigned int data_packet_length){
   unsigned int frame_length, frame_rsp_length;
   unsigned char *frame, frame_rsp[255];
+  static long int total_bytes_sent=0;
 
   frame = create_I_frame(&frame_length, data_packet, data_packet_length);
   while(attempts < data_layer.numTransmissions){
@@ -124,6 +125,7 @@ int llwrite(int fd, unsigned char* data_packet, unsigned int data_packet_length)
       free(frame);
       return -1;
     }
+    total_bytes_sent += frame_length;
 
     alarm(data_layer.timeout);
 
@@ -133,7 +135,7 @@ int llwrite(int fd, unsigned char* data_packet, unsigned int data_packet_length)
       if(is_frame_RR(frame_rsp)){
         c = !c;
         free(frame);
-        return frame_length;
+        return total_bytes_sent;
       }
       //If we get a REJ frame it will just resend the I frame
     }

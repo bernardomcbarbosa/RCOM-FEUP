@@ -30,7 +30,7 @@
 #define TRUE 1
 #define FALSE 0
 
-#define TPROP 1
+#define TPROP 2
 
 typedef struct linkLayer {
   int fd; //Serial port file descriptor
