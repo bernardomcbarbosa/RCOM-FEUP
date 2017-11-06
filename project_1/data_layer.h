@@ -25,12 +25,12 @@
 
 #define BAUDRATE B38400
 
-#define HEADER_ERROR_PROB 30
-#define BODY_ERROR_PROB 30
+#define HEADER_ERROR_PROB 0
+#define BODY_ERROR_PROB 0
 #define TRUE 1
 #define FALSE 0
 
-#define TPROP 2
+#define TPROP 0
 
 typedef struct linkLayer {
   int fd; //Serial port file descriptor
