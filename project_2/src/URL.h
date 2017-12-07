@@ -1,6 +1,11 @@
 #ifndef URL_H
 #define URL_H
 
+#define URL_HEADER "ftp://"
+#define DEFAULT_USER "anonymous"
+#define DEFAULT_PASSWORD "mail@domain"
+
+
 typedef char url_content[256];
 
 struct URL {
@@ -14,5 +19,8 @@ struct URL {
 };
 
 void initURL(struct URL *url);
+int parseURL(struct URL *url, const char *urlArg);
 
+int parseNormalAuth(struct URL *url, const char *urlArg);
+void initDefaultAuth(struct URL *url);
 #endif
