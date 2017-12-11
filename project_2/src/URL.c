@@ -36,6 +36,14 @@ int parseURL(struct URL *url, const char *urlArg){
   memcpy(url->host, startOfHost, (endOfHost-startOfHost));
   printf("Host : %s\n", url->host);
 
+	char* lastSlash = strrchr(startOfHost, '/');
+	memcpy(url->path, startOfHost, (lastSlash-startOfHost));
+	printf("Path : %s\n", url->path);
+	lastSlash++;
+
+	memcpy(url->filename, lastSlash, strlen(lastSlash)+1);
+	printf("Filename : %s\n", url->filename);
+
   return 0;
 }
 

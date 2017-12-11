@@ -2,6 +2,7 @@
 #include <stdlib.h>
 
 #include "URL.h"
+#include "ftp.h"
 #include "main.h"
 
 int main(int argc, char** argv){
@@ -18,6 +19,9 @@ int main(int argc, char** argv){
     fprintf(stderr, "Invalid URL\n");
     exit(1);
   }
+
+  struct FTP connection;
+
 
   return 0;
 }
