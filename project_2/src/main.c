@@ -20,6 +20,8 @@ int main(int argc, char** argv){
     exit(1);
   }
 
+  getIp(&url);
+
   struct FTP connection;
 
 
