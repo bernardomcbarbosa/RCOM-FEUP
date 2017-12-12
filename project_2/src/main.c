@@ -20,9 +20,17 @@ int main(int argc, char** argv){
     exit(1);
   }
 
-  getIp(&url);
+  if (getIp(&url) != 0){
+    fprintf(stderr, "ERROR: Cannot find ip to hostname %s\n", url.host);
+    exit(1);
+  }
 
   struct FTP connection;
+
+  if((connection.control_socket_fd = connect_to(url.ip, url.port)) < 0){
+    fprintf(stderr, "ERROR: Cannot connect socket.\n");
+    exit(1);
+  }
 
 
   return 0;

@@ -6,7 +6,7 @@ CCFLAGS= -Wall
 
 PROG = rcom.out
 
-SOURCES = URL.c
+SOURCES = URL.c ftp.c
 OBJECTS = $(SOURCES:.c=.o)
 
 .PHONY : rcom
