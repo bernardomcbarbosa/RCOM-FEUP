@@ -32,15 +32,16 @@ int parseURL(struct URL *url, const char *urlArg){
     startOfHost = urlArg + strlen(URL_HEADER); //"ftp://->host"
   }
 
-  char* endOfHost = strchr(startOfHost, '/');
+  char* endOfHost = strchr(startOfHost, '/'); //"ftp://host->/"
   memcpy(url->host, startOfHost, (endOfHost-startOfHost));
   printf("Host : %s\n", url->host);
 
-	char* lastSlash = strrchr(startOfHost, '/');
-	memcpy(url->path, startOfHost, (lastSlash-startOfHost));
+	char* lastSlash = strrchr(startOfHost, '/'); //"ftp://host/path->/filename"
+	endOfHost++; //"ftp://host/->path"
+	memcpy(url->path, endOfHost, (lastSlash-endOfHost));
 	printf("Path : %s\n", url->path);
-	lastSlash++;
 
+	lastSlash++; //"ftp://host/path/->filename"
 	memcpy(url->filename, lastSlash, strlen(lastSlash)+1);
 	printf("Filename : %s\n", url->filename);
 

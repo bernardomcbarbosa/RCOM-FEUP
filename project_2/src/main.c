@@ -56,6 +56,23 @@ int main(int argc, char** argv){
     return -1;
   }
 
+  //Maybe connect here to host
+
+  if (ftpRetr(&connection, &url) != 0){
+    fprintf(stderr, "Error: .\n");
+    return -1;
+  }
+
+  if (ftpDownload(&connection, &url) != 0){
+    fprintf(stderr, "Error: Cannot download file from host.\n");
+    return -1;
+  }
+
+  if (disconnect_from(&connection, &url) != 0){
+    fprintf(stderr, "Error: Couldn't disconnect from host.\n");
+    return -1;
+  }
+
   return 0;
 }
 

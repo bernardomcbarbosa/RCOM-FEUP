@@ -57,6 +57,20 @@ int connect_to(const char *adress, const int port){
   return sockfd;
 }
 
+int disconnect_from (const struct FTP *connection, const struct URL *url){
+  char *quitMsg = malloc(6 * sizeof(char));
+  sprintf(quitMsg, "quit\r\n");
+
+  if (ftpWrite(connection, quitMsg) != 0){
+    fprintf(stderr, "Error: Couldn't send message to host.\n");
+    return -1;
+  }
+
+  close(connection->control_socket_fd);
+
+  return 0;
+}
+
 int ftpLogin(const struct FTP *connection, const struct URL *url){
   char code[CODE_LENGTH];
   char frame[FRAME_SIZE];
@@ -158,6 +172,52 @@ int ftpPasv (struct FTP *connection){
 		printf("ERROR: Incorrect file descriptor associated to ftp data socket fd.\n");
 		return 1;
 	}
+
+  return 0;
+}
+
+int ftpRetr (const struct FTP *connection, const struct URL *url){
+  char frame[FRAME_SIZE];
+
+  sprintf(frame, "RETR %s/%s\r\n", url->path, url->filename);
+  printf("%s\n", frame);
+
+  if (ftpWrite(connection, frame) !=0){
+    fprintf(stderr, "Error: Couldn't send path to host.\n");
+    return -1;
+  }
+
+  if (ftpRead(connection, frame, FRAME_SIZE) != 0){
+    fprintf(stderr, "Error:.\n");
+    return -1;
+  }
+
+  return 0;
+}
+
+int ftpDownload (const struct FTP *connection, const struct URL *url){
+  FILE *f;
+  char frame[FRAME_SIZE];
+  int read_bytes;
+
+  if ((f = fopen(url->filename, "w")) == NULL){
+    fprintf(stderr, "Error: Couldn't create/open %s file\n", url->filename);
+    return -1;
+  }
+
+  while((read_bytes = read(connection->data_socket_fd, frame, FRAME_SIZE))){
+    if (read_bytes == -1){
+      fprintf(stderr, "Error: Nothing was received through the data socket.\n");
+      return -1;
+    }
+    if(fwrite(frame, read_bytes, 1, f) < 0){
+      fprintf(stderr, "Error: Cannot write data to file %s.\n", url->filename);
+      return -1;
+    }
+  }
+
+  close(connection->data_socket_fd);
+  fclose(f);
 
   return 0;
 }

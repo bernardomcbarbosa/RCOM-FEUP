@@ -15,9 +15,13 @@ struct FTP{
 
 int getIp(struct URL *url);
 int connect_to (const char *adress, const int port);
+int disconnect_from (const struct FTP *connection, const struct URL *url);
 
 int ftpLogin (const struct FTP *connection, const struct URL *url);
 int ftpPasv (struct FTP *connection);
+int ftpRetr (const struct FTP *connection, const struct URL *url);
+
+int ftpDownload (const struct FTP *connection, const struct URL *url);
 
 int ftpWrite(const struct FTP *connection, const char *frame);
 int ftpReadCode(const struct FTP *connection, char *frame, char *code);
