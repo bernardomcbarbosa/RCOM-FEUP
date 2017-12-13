@@ -10,6 +10,7 @@
 
 #include "URL.h"
 #include "ftp.h"
+#include "main.h"
 
 int getIp(struct URL *url){
   struct hostent* h;
@@ -43,13 +44,13 @@ int connect_to(const char *adress, const int port){
 
   // open an TCP socket
   if ((sockfd = socket(AF_INET, SOCK_STREAM, 0)) < 0) {
-    fprintf(stderr, "socket(): %s", strerror(errno));
+    fprintf(stderr, "socket(): %s.\n", strerror(errno));
     return -1;
   }
 
   // connect to the server
   if (connect(sockfd, (struct sockaddr *) &server_addr, sizeof(server_addr)) < 0) {
-    fprintf(stderr, "connect(): %s", strerror(errno));
+    fprintf(stderr, "connect(): %s.\n", strerror(errno));
     return -1;
   }
 
@@ -58,21 +59,23 @@ int connect_to(const char *adress, const int port){
 
 int ftpLogin(const struct FTP *connection, const struct URL *url){
   char code[CODE_LENGTH];
-  char frame[1024];
+  char frame[FRAME_SIZE];
 
   char *username = malloc(sizeof(url->user) + 5 * sizeof(char));
-  sprintf(username, "user %s\r\n", url->user);
+  sprintf(username, "USER %s\r\n", url->user);
+  printf("%s\n", username);
 
   if (ftpWrite(connection, username) != 0){
     fprintf(stderr, "Error: Couldn't send message to host.\n");
     free(username);
     return -1;
   }
-  if(ftpRead(connection, frame, strlen(frame)) != 0){
+  if(ftpRead(connection, frame, FRAME_SIZE) != 0){
     fprintf(stderr, "Error: ftpReadCode()");
     free(username);
     return -1;
   }
+
 /*
   if(ftpReadCode(connection, code, CODE_READY_FOR_PW) != 0){
     fprintf(stderr, "Error: ftpReadCode()");
@@ -83,18 +86,21 @@ int ftpLogin(const struct FTP *connection, const struct URL *url){
   free(username);
 
   char *password = malloc(sizeof(url->password) + 5 * sizeof(char));
-	sprintf(password, "pass %s\r\n", url->password);
+	sprintf(password, "PASS %s\r\n", url->password);
+  printf("%s\n", password);
 
   if (ftpWrite(connection, password) != 0){
     fprintf(stderr, "Error: Couldn't send message to host.\n");
     free(password);
     return -1;
   }
-  if(ftpRead(connection, frame, strlen(frame)) != 0){
+
+  if(ftpRead(connection, frame, FRAME_SIZE) != 0){
     fprintf(stderr, "Error: ftpReadCode()");
     free(password);
     return -1;
   }
+
   /*
   if(ftpRead(connection, code, CODE_LOGGED_IN) != 0){
     fprintf(stderr, "Error: ftpReadCode()");
@@ -103,6 +109,55 @@ int ftpLogin(const struct FTP *connection, const struct URL *url){
   }
   */
   free(password);
+
+  return 0;
+}
+
+int ftpPasv (struct FTP *connection){
+  char frame[FRAME_SIZE];
+  char pasvIP[16];
+  int pasvPort;
+
+  char * pasv = malloc(7 * sizeof(char));
+	sprintf(pasv, "PASV \r\n");
+
+  if (ftpWrite(connection, pasv) != 0){
+    fprintf(stderr, "Error: Couldn't send message to host.\n");
+    free(pasv);
+    return -1;
+  }
+
+  if(ftpRead(connection, frame, FRAME_SIZE) != 0){
+    fprintf(stderr, "Error: Didn't receive passive mode information.\n");
+    free(pasv);
+    return -1;
+  }
+
+  free(pasv);
+
+  // starting process information
+  int ip[4];
+  int port[2];
+
+	if ((sscanf(frame, "227 Entering Passive Mode (%d,%d,%d,%d,%d,%d)", &ip[0],&ip[1], &ip[2], &ip[3], &port[0], &port[1])) < 0){
+		fprintf(stderr, "ERROR: Cannot process information to calculating port.\n");
+		return -1;
+	}
+
+  if ((sprintf(pasvIP, "%d.%d.%d.%d", ip[0], ip[1], ip[2], ip[3])) < 0){
+		fprintf(stderr, "ERROR: Cannot form ip address.\n");
+		return 1;
+	}
+
+  pasvPort = port[0]*256 + port[1];
+
+  printf("IP: %s\n", pasvIP);
+	printf("PORT: %d\n", pasvPort);
+
+  if ((connection->data_socket_fd = connect_to(pasvIP, pasvPort))<0) {
+		printf("ERROR: Incorrect file descriptor associated to ftp data socket fd.\n");
+		return 1;
+	}
 
   return 0;
 }

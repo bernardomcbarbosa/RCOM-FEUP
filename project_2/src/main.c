@@ -38,8 +38,8 @@ int main(int argc, char** argv){
   if(ftpRead(&connection, frame, FRAME_SIZE) != 0){
     fprintf(stderr, "Error: ftpReadCode()");
     return -1;
-    printf("acabou conexao\n");
   }
+
   /*
   if (ftpReadCode(&connection, code, CODE_READY_NEW_USER)){
     fprintf(stderr, "ERROR: ftpRead().\n");
@@ -47,13 +47,14 @@ int main(int argc, char** argv){
   }*/
 
   if (ftpLogin(&connection, &url) != 0){
-    fprintf(stderr, "Error: Couldn't Login\n");
+    fprintf(stderr, "Error: Couldn't Login.\n");
     return -1;
   }
 
-
-
-
+  if (ftpPasv(&connection) != 0){
+    fprintf(stderr, "Error: Couldn't enter Passive Mode.\n");
+    return -1;
+  }
 
   return 0;
 }
