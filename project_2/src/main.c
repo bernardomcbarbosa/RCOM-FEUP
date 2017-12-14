@@ -11,7 +11,7 @@ int main(int argc, char** argv){
   if(argc != 2){
     fprintf(stderr, "WARNING: Wrong number of arguments.\n");
     printUsage(argv[0]);
-    return 1;
+    return -1;
   }
 
   struct URL url;
@@ -23,7 +23,7 @@ int main(int argc, char** argv){
   }
 
   if (getIp(&url) != 0){
-    fprintf(stderr, "ERROR: Cannot find ip to hostname %s\n", url.host);
+    fprintf(stderr, "Error: Cannot find ip to hostname %s\n", url.host);
     return -1;
   }
 
@@ -36,7 +36,7 @@ int main(int argc, char** argv){
 
 
   if(ftpRead(&connection, frame, FRAME_SIZE, CODE_READY_NEW_USER) != 0){
-    fprintf(stderr, "Error: ftpReadCode()");
+    fprintf(stderr, "Error: Couldn't receive message from host.\n");
     return -1;
   }
 
@@ -55,7 +55,7 @@ int main(int argc, char** argv){
 
   if ((connection.data_socket_fd = connect_to(pasvIP, pasvPort)) < 0) {
 		fprintf(stderr, "Error: Cannot connect to data socket.\n");
-		return 1;
+		return -1;
 	}
 
   if (ftpRetr(&connection, &url) != 0){

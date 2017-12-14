@@ -17,7 +17,7 @@ int getIp(struct URL *url){
 
   if ((h = gethostbyname(url->host)) == NULL) {
 		herror("Error, could not retrieve host information.\n");
-		return 1;
+		return -1;
 	}
 
   printf("Host name  : %s\n", h->h_name);
@@ -76,7 +76,6 @@ int ftpLogin(const struct FTP *connection, const struct URL *url){
 
   char *username = malloc(sizeof(url->user) + 5 * sizeof(char));
   sprintf(username, "USER %s\r\n", url->user);
-  printf("%s\n", username);
 
   if (ftpWrite(connection, username) != 0){
     fprintf(stderr, "Error: Couldn't send message to host.\n");
@@ -85,7 +84,7 @@ int ftpLogin(const struct FTP *connection, const struct URL *url){
   }
 
   if(ftpRead(connection, frame, FRAME_SIZE, CODE_READY_FOR_PW) != 0){
-    fprintf(stderr, "Error: ftpReadCode()");
+    fprintf(stderr, "Error: Couldn't receive message from host.\n");
     free(username);
     return -1;
   }
@@ -94,7 +93,6 @@ int ftpLogin(const struct FTP *connection, const struct URL *url){
 
   char *password = malloc(sizeof(url->password) + 5 * sizeof(char));
 	sprintf(password, "PASS %s\r\n", url->password);
-  printf("%s\n", password);
 
   if (ftpWrite(connection, password) != 0){
     fprintf(stderr, "Error: Couldn't send message to host.\n");
@@ -103,7 +101,7 @@ int ftpLogin(const struct FTP *connection, const struct URL *url){
   }
 
   if(ftpRead(connection, frame, FRAME_SIZE, CODE_LOGGED_IN) != 0){
-    fprintf(stderr, "Error: ftpReadCode()");
+    fprintf(stderr, "Error: Couldn't receive message from host.\n");
     free(password);
     return -1;
   }
@@ -138,13 +136,13 @@ int ftpPasv (struct FTP *connection, char *pasvIP, int *pasvPort){
   int port[2];
 
 	if ((sscanf(frame, "227 Entering Passive Mode (%d,%d,%d,%d,%d,%d)", &ip[0],&ip[1], &ip[2], &ip[3], &port[0], &port[1])) < 0){
-		fprintf(stderr, "ERROR: Cannot process information to calculating port.\n");
+		fprintf(stderr, "Error: Cannot process passive mode information.\n");
 		return -1;
 	}
 
   if ((sprintf(pasvIP, "%d.%d.%d.%d", ip[0], ip[1], ip[2], ip[3])) < 0){
-		fprintf(stderr, "ERROR: Cannot form ip address.\n");
-		return 1;
+		fprintf(stderr, "Error: Cannot form ip address.\n");
+		return -1;
 	}
 
   *pasvPort = port[0]*256 + port[1];
@@ -164,7 +162,7 @@ int ftpRetr (const struct FTP *connection, const struct URL *url){
   }
 
   if (ftpRead(connection, frame, FRAME_SIZE, CODE_FILE_OKAY) != 0){
-    fprintf(stderr, "Error:.\n");
+    fprintf(stderr, "Error: Couldn't receive message from host.\n");
     return -1;
   }
 
@@ -213,7 +211,7 @@ int ftpRead(const struct FTP *connection, char *frame, size_t frame_length, char
   do {
     memset(frame, 0, frame_length);
     frame = fgets(frame, frame_length, fp);
-    printf("%s\n", frame);
+    printf("%s", frame);
   } while(!('1' <= frame[0] && frame[0] <= '5')|| frame[3] != ' ');
 
   if(strncmp(frame, exp_code, CODE_LENGTH) != 0){
