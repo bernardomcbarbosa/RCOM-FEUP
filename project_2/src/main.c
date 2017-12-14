@@ -59,7 +59,7 @@ int main(int argc, char** argv){
 	}
 
   if (ftpRetr(&connection, &url) != 0){
-    fprintf(stderr, "Error: .\n");
+    fprintf(stderr, "Error: Couldn't find the file.\n");
     return -1;
   }
 

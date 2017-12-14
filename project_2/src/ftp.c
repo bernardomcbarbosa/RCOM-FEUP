@@ -17,7 +17,7 @@ int getIp(struct URL *url){
   struct hostent* h;
 
   if ((h = gethostbyname(url->host)) == NULL) {
-		herror("Error, could not retrieve host information.\n");
+		herror("Error: could not retrieve host information.\n");
 		return -1;
 	}
 
@@ -65,13 +65,17 @@ int disconnect_from (const struct FTP *connection, const struct URL *url){
 
   if (ftpWrite(connection, quitMsg) != 0){
     fprintf(stderr, "Error: Couldn't send message to host.\n");
+    free(quitMsg);
     return -1;
   }
 
   if (ftpRead(connection, frame, FRAME_SIZE, CODE_LOGGING_OUT) != 0){
     fprintf(stderr, "Error: Couldn't receive message from host.\n");
+    free(quitMsg);
     return -1;
   }
+
+  free(quitMsg);
 
   close(connection->control_socket_fd);
 
@@ -161,7 +165,6 @@ int ftpPasv (struct FTP *connection, char *pasvIP, int *pasvPort){
 
 int ftpRetr (const struct FTP *connection, const struct URL *url){
   char frame[FRAME_SIZE];
-
   sprintf(frame, "RETR %s\r\n", url->path);
 
   if (ftpWrite(connection, frame) !=0){
@@ -221,7 +224,7 @@ int ftpWrite(const struct FTP *connection, const char *frame){
 
 
 int ftpRead(const struct FTP *connection, char *frame, size_t frame_length, char *exp_code){
-  FILE* fp = fdopen(connection->control_socket_fd, "r");
+  FILE* fp = fdopen(connection->control_socket_fd, "r"); //We close on disconnect_from()
 
   do {
     memset(frame, 0, frame_length);
