@@ -84,19 +84,13 @@ int ftpLogin(const struct FTP *connection, const struct URL *url){
     free(username);
     return -1;
   }
-  if(ftpRead(connection, frame, FRAME_SIZE) != 0){
+
+  if(ftpRead(connection, frame, FRAME_SIZE, CODE_READY_FOR_PW) != 0){
     fprintf(stderr, "Error: ftpReadCode()");
     free(username);
     return -1;
   }
 
-/*
-  if(ftpReadCode(connection, code, CODE_READY_FOR_PW) != 0){
-    fprintf(stderr, "Error: ftpReadCode()");
-    free(username);
-    return -1;
-  }
-  */
   free(username);
 
   char *password = malloc(sizeof(url->password) + 5 * sizeof(char));
@@ -109,19 +103,12 @@ int ftpLogin(const struct FTP *connection, const struct URL *url){
     return -1;
   }
 
-  if(ftpRead(connection, frame, FRAME_SIZE) != 0){
+  if(ftpRead(connection, frame, FRAME_SIZE, CODE_LOGGED_IN) != 0){
     fprintf(stderr, "Error: ftpReadCode()");
     free(password);
     return -1;
   }
 
-  /*
-  if(ftpRead(connection, code, CODE_LOGGED_IN) != 0){
-    fprintf(stderr, "Error: ftpReadCode()");
-    free(password);
-    return -1;
-  }
-  */
   free(password);
 
   return 0;
@@ -141,7 +128,7 @@ int ftpPasv (struct FTP *connection){
     return -1;
   }
 
-  if(ftpRead(connection, frame, FRAME_SIZE) != 0){
+  if(ftpRead(connection, frame, FRAME_SIZE, CODE_PASSIVE_MODE) != 0){
     fprintf(stderr, "Error: Didn't receive passive mode information.\n");
     free(pasv);
     return -1;
@@ -187,7 +174,7 @@ int ftpRetr (const struct FTP *connection, const struct URL *url){
     return -1;
   }
 
-  if (ftpRead(connection, frame, FRAME_SIZE) != 0){
+  if (ftpRead(connection, frame, FRAME_SIZE, CODE_FILE_OKAY) != 0){
     fprintf(stderr, "Error:.\n");
     return -1;
   }
@@ -230,26 +217,8 @@ int ftpWrite(const struct FTP *connection, const char *frame){
     return 0;
 }
 
-int ftpReadCode(const struct FTP *connection, char *code, char *exp_code){
-  FILE* fp = fdopen(connection->control_socket_fd, "r");
 
-  do{
-    memset(code, 0, CODE_LENGTH);
-    code = fgets(code, CODE_LENGTH, fp);
-    printf("%s\n", code);
-  } while(!('1' <= code[0] && code[0] <= '5'));
-
-  if(strncmp(code, exp_code, CODE_LENGTH) != 0){
-    fprintf(stderr, "Error: Wrong code received\n");
-
-    return -1;
-  }
-
-  return 0;
-}
-
-
-int ftpRead(const struct FTP *connection, char *frame, size_t frame_length){
+int ftpRead(const struct FTP *connection, char *frame, size_t frame_length, char *exp_code){
   FILE* fp = fdopen(connection->control_socket_fd, "r");
 
   do {
@@ -257,6 +226,11 @@ int ftpRead(const struct FTP *connection, char *frame, size_t frame_length){
     frame = fgets(frame, frame_length, fp);
     printf("%s\n", frame);
   } while(!('1' <= frame[0] && frame[0] <= '5')|| frame[3] != ' ');
+
+  if(strncmp(frame, exp_code, CODE_LENGTH) != 0){
+    fprintf (stderr, "Error: Wrong code received.\n");
+    return -1;
+  }
 
   return 0;
 }

@@ -3,10 +3,12 @@
 
 #define FTP_PORT 21
 
-#define CODE_LENGTH 4
+#define CODE_LENGTH 3
 #define CODE_READY_NEW_USER "220"
 #define CODE_READY_FOR_PW "331"
 #define CODE_LOGGED_IN "230"
+#define CODE_PASSIVE_MODE "227"
+#define CODE_FILE_OKAY "150"
 
 struct FTP{
   int control_socket_fd; // file descriptor to control socket
@@ -24,8 +26,6 @@ int ftpRetr (const struct FTP *connection, const struct URL *url);
 int ftpDownload (const struct FTP *connection, const struct URL *url);
 
 int ftpWrite(const struct FTP *connection, const char *frame);
-int ftpReadCode(const struct FTP *connection, char *frame, char *code);
-int ftpRead(const struct FTP *connection, char *frame, size_t frame_length);
-
+int ftpRead(const struct FTP *connection, char *frame, size_t frame_length, char *exp_code);
 
 #endif

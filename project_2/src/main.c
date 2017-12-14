@@ -35,16 +35,11 @@ int main(int argc, char** argv){
     return -1;
   }
 
-  if(ftpRead(&connection, frame, FRAME_SIZE) != 0){
+
+  if(ftpRead(&connection, frame, FRAME_SIZE, CODE_READY_NEW_USER) != 0){
     fprintf(stderr, "Error: ftpReadCode()");
     return -1;
   }
-
-  /*
-  if (ftpReadCode(&connection, code, CODE_READY_NEW_USER)){
-    fprintf(stderr, "ERROR: ftpRead().\n");
-    return -1;
-  }*/
 
   if (ftpLogin(&connection, &url) != 0){
     fprintf(stderr, "Error: Couldn't Login.\n");
