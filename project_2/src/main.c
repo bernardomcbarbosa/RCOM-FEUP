@@ -6,7 +6,6 @@
 #include "main.h"
 
 int main(int argc, char** argv){
-  char code[CODE_LENGTH];
   char frame[FRAME_SIZE];
 
   if(argc != 2){
@@ -31,7 +30,7 @@ int main(int argc, char** argv){
   struct FTP connection;
 
   if((connection.control_socket_fd = connect_to(url.ip, url.port)) < 0){
-    fprintf(stderr, "ERROR: Cannot connect socket.\n");
+    fprintf(stderr, "Error: Cannot connect  to control socket.\n");
     return -1;
   }
 
@@ -46,12 +45,18 @@ int main(int argc, char** argv){
     return -1;
   }
 
-  if (ftpPasv(&connection) != 0){
+  char pasvIP[16];
+  int pasvPort;
+
+  if (ftpPasv(&connection, pasvIP, &pasvPort) != 0){
     fprintf(stderr, "Error: Couldn't enter Passive Mode.\n");
     return -1;
   }
 
-  //Maybe connect here to host
+  if ((connection.data_socket_fd = connect_to(pasvIP, pasvPort)) < 0) {
+		fprintf(stderr, "Error: Cannot connect to data socket.\n");
+		return 1;
+	}
 
   if (ftpRetr(&connection, &url) != 0){
     fprintf(stderr, "Error: .\n");

@@ -20,7 +20,7 @@ int connect_to (const char *adress, const int port);
 int disconnect_from (const struct FTP *connection, const struct URL *url);
 
 int ftpLogin (const struct FTP *connection, const struct URL *url);
-int ftpPasv (struct FTP *connection);
+int ftpPasv (struct FTP *connection, char *pasvIP, int *pasvPort);
 int ftpRetr (const struct FTP *connection, const struct URL *url);
 
 int ftpDownload (const struct FTP *connection, const struct URL *url);

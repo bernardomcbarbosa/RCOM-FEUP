@@ -72,7 +72,6 @@ int disconnect_from (const struct FTP *connection, const struct URL *url){
 }
 
 int ftpLogin(const struct FTP *connection, const struct URL *url){
-  char code[CODE_LENGTH];
   char frame[FRAME_SIZE];
 
   char *username = malloc(sizeof(url->user) + 5 * sizeof(char));
@@ -114,10 +113,8 @@ int ftpLogin(const struct FTP *connection, const struct URL *url){
   return 0;
 }
 
-int ftpPasv (struct FTP *connection){
+int ftpPasv (struct FTP *connection, char *pasvIP, int *pasvPort){
   char frame[FRAME_SIZE];
-  char pasvIP[16];
-  int pasvPort;
 
   char * pasv = malloc(7 * sizeof(char));
 	sprintf(pasv, "PASV \r\n");
@@ -150,15 +147,7 @@ int ftpPasv (struct FTP *connection){
 		return 1;
 	}
 
-  pasvPort = port[0]*256 + port[1];
-
-  printf("IP: %s\n", pasvIP);
-	printf("PORT: %d\n", pasvPort);
-
-  if ((connection->data_socket_fd = connect_to(pasvIP, pasvPort))<0) {
-		printf("ERROR: Incorrect file descriptor associated to ftp data socket fd.\n");
-		return 1;
-	}
+  *pasvPort = port[0]*256 + port[1];
 
   return 0;
 }
