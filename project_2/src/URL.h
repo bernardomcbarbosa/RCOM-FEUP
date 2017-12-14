@@ -1,6 +1,9 @@
 #ifndef URL_H
 #define URL_H
 
+#define NORMAL 0
+#define ANONYMOUS 1
+
 #define URL_HEADER "ftp://"
 #define DEFAULT_USER "anonymous"
 #define DEFAULT_PASSWORD "mail@domain"
@@ -14,7 +17,6 @@ struct URL {
 	url_content host; // string to host
 	url_content ip; // string to IP
 	url_content path; // string to path
-	url_content filename; // string to filename
 	int port; // integer to port
 };
 

@@ -1,5 +1,7 @@
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
+#include <regex.h>
 
 #include "URL.h"
 
@@ -8,42 +10,64 @@ void initURL(struct URL *url){
 	memset(url->password, 0, sizeof(url_content));
 	memset(url->host, 0, sizeof(url_content));
 	memset(url->path, 0, sizeof(url_content));
-	memset(url->filename, 0, sizeof(url_content));
 	url->port = 21;
 }
 
+const char* regExpression =
+		"ftp://([([A-Za-z0-9])*:([A-Za-z0-9])*@])*([A-Za-z0-9.~-])+/([[A-Za-z0-9/~._-])+";
+
+const char* regExprAnony = "ftp://([A-Za-z0-9.~-])+/([[A-Za-z0-9/~._-])+";
+
 
 int parseURL(struct URL *url, const char *urlArg){
+	char *activeExpression;
+	regex_t* regex;
+	size_t nmatch = strlen(urlArg);
+	regmatch_t pmatch[nmatch];
+	int mode;
 
-  if(strncmp(urlArg, URL_HEADER, strlen(URL_HEADER)) != 0){
-    fprintf(stderr, "Your link must begin with 'ftp://'\n");
-    return 1;
-  }
-
-  const char *startOfHost = strchr(urlArg, ']');
   if(urlArg[6] == '['){
     //Normal
-    parseNormalAuth(url, urlArg);
-    startOfHost++; //"ftp://[username:password@]->host"
+		activeExpression = (char *) regExpression;
+		mode = NORMAL;
   }
   else{
     //Anonymous
-    initDefaultAuth(url);
-    startOfHost = urlArg + strlen(URL_HEADER); //"ftp://->host"
+		activeExpression = (char *) regExprAnony;
+		mode = ANONYMOUS;
   }
+
+	regex = (regex_t*) malloc(sizeof(regex_t));
+
+	if (regcomp(regex, activeExpression, REG_EXTENDED) != 0) {
+		perror("URL format is wrong ");
+		return -1;
+	}
+
+	if (regexec(regex, urlArg, nmatch, pmatch, REG_EXTENDED) != 0) {
+		perror("URL couldn't execute ");
+		return -1;
+	}
+
+	free(regex);
+
+	const char *startOfHost = strchr(urlArg, ']');
+	if (mode == NORMAL){
+		parseNormalAuth(url, urlArg);
+		startOfHost++; //"ftp://[username:password@]->host"
+	}
+	else{
+		initDefaultAuth(url);
+		startOfHost = urlArg + strlen(URL_HEADER); //"ftp://->host"
+	}
 
   char* endOfHost = strchr(startOfHost, '/'); //"ftp://host->/"
   memcpy(url->host, startOfHost, (endOfHost-startOfHost));
   printf("Host : %s\n", url->host);
 
-	char* lastSlash = strrchr(startOfHost, '/'); //"ftp://host/path->/filename"
 	endOfHost++; //"ftp://host/->path"
-	memcpy(url->path, endOfHost, (lastSlash-endOfHost));
+	memcpy(url->path, endOfHost, strlen(endOfHost));
 	printf("Path : %s\n", url->path);
-
-	lastSlash++; //"ftp://host/path/->filename"
-	memcpy(url->filename, lastSlash, strlen(lastSlash)+1);
-	printf("Filename : %s\n", url->filename);
 
   return 0;
 }

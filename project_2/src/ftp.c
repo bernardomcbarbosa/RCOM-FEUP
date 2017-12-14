@@ -6,6 +6,7 @@
 #include <netinet/in.h> //inet_ntoa
 #include <arpa/inet.h> //inet_ntoa
 #include <unistd.h> //write
+#include <libgen.h> //basename
 #include <errno.h>
 
 #include "URL.h"
@@ -153,8 +154,7 @@ int ftpPasv (struct FTP *connection, char *pasvIP, int *pasvPort){
 int ftpRetr (const struct FTP *connection, const struct URL *url){
   char frame[FRAME_SIZE];
 
-  sprintf(frame, "RETR %s/%s\r\n", url->path, url->filename);
-  printf("%s\n", frame);
+  sprintf(frame, "RETR %s\r\n", url->path);
 
   if (ftpWrite(connection, frame) !=0){
     fprintf(stderr, "Error: Couldn't send path to host.\n");
@@ -174,8 +174,10 @@ int ftpDownload (const struct FTP *connection, const struct URL *url){
   char frame[FRAME_SIZE];
   int read_bytes;
 
-  if ((f = fopen(url->filename, "w")) == NULL){
-    fprintf(stderr, "Error: Couldn't create/open %s file\n", url->filename);
+  char *filename = basename((char *) url->path);
+
+  if ((f = fopen(filename, "w")) == NULL){
+    fprintf(stderr, "Error: Couldn't create/open %s file\n", filename);
     return -1;
   }
 
@@ -185,7 +187,7 @@ int ftpDownload (const struct FTP *connection, const struct URL *url){
       return -1;
     }
     if(fwrite(frame, read_bytes, 1, f) < 0){
-      fprintf(stderr, "Error: Cannot write data to file %s.\n", url->filename);
+      fprintf(stderr, "Error: Cannot write data to file %s.\n", filename);
       return -1;
     }
   }

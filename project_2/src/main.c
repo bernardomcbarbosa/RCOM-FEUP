@@ -9,9 +9,9 @@ int main(int argc, char** argv){
   char frame[FRAME_SIZE];
 
   if(argc != 2){
-    fprintf(stderr, "WARNING: Wrong number of arguments.\n");
+    fprintf(stderr, "Warning: Wrong number of arguments.\n");
     printUsage(argv[0]);
-    return -1;
+    return 0;
   }
 
   struct URL url;
