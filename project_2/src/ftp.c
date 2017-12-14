@@ -59,11 +59,17 @@ int connect_to(const char *adress, const int port){
 }
 
 int disconnect_from (const struct FTP *connection, const struct URL *url){
+  char frame[FRAME_SIZE];
   char *quitMsg = malloc(6 * sizeof(char));
   sprintf(quitMsg, "quit\r\n");
 
   if (ftpWrite(connection, quitMsg) != 0){
     fprintf(stderr, "Error: Couldn't send message to host.\n");
+    return -1;
+  }
+
+  if (ftpRead(connection, frame, FRAME_SIZE, CODE_LOGGING_OUT) != 0){
+    fprintf(stderr, "Error: Couldn't receive message from host.\n");
     return -1;
   }
 
@@ -77,6 +83,7 @@ int ftpLogin(const struct FTP *connection, const struct URL *url){
 
   char *username = malloc(sizeof(url->user) + 5 * sizeof(char));
   sprintf(username, "USER %s\r\n", url->user);
+  printf("%s", username);
 
   if (ftpWrite(connection, username) != 0){
     fprintf(stderr, "Error: Couldn't send message to host.\n");
@@ -94,6 +101,7 @@ int ftpLogin(const struct FTP *connection, const struct URL *url){
 
   char *password = malloc(sizeof(url->password) + 5 * sizeof(char));
 	sprintf(password, "PASS %s\r\n", url->password);
+  printf("%s", password);
 
   if (ftpWrite(connection, password) != 0){
     fprintf(stderr, "Error: Couldn't send message to host.\n");
@@ -190,6 +198,11 @@ int ftpDownload (const struct FTP *connection, const struct URL *url){
       fprintf(stderr, "Error: Cannot write data to file %s.\n", filename);
       return -1;
     }
+  }
+
+  if (ftpRead(connection, frame, FRAME_SIZE, CODE_CLOSING_DATA_CON) != 0){
+    fprintf(stderr, "Error: Couldn't receive message from host.\n");
+    return -1;
   }
 
   close(connection->data_socket_fd);

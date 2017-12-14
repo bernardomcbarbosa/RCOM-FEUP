@@ -9,6 +9,8 @@
 #define CODE_LOGGED_IN "230"
 #define CODE_PASSIVE_MODE "227"
 #define CODE_FILE_OKAY "150"
+#define CODE_CLOSING_DATA_CON "226"
+#define CODE_LOGGING_OUT "221"
 
 struct FTP{
   int control_socket_fd; // file descriptor to control socket
